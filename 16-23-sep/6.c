@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
+//у меня (и, видимо, у бота тоже) не подключалась math, поэтому пришлось писать самой
 double my_pow(double base, int exponent)
 {
     double result = 1.0;
@@ -15,6 +16,7 @@ double my_pow(double base, int exponent)
     return (exponent < 0) ? 1.0 / result : result;
 }
 
+//нарезаю массив на кусочки нужной мне длины
 char *slice(char *array, char *sliced_array, int i, int length)
 {
     for (int j = 0; j < length; j++)
@@ -25,6 +27,7 @@ char *slice(char *array, char *sliced_array, int i, int length)
     return sliced_array;
 }
 
+//перевести 8 битов в число
 int read_and_convert_full(char *scan, int i)
 {
     char num[8 + 1];
@@ -43,6 +46,7 @@ int read_and_convert_full(char *scan, int i)
     return dec_num;
 }
 
+//перевести оставшиеся в строке биты в число
 int read_and_convert_left_over(char *scan, int left_over_bites, int i)
 {
     char *num = malloc(left_over_bites + 1);
@@ -86,16 +90,18 @@ int main(void)
         // считать все это дело и записать его
         char *scan = malloc(n + 1);
         scan = fgets(scan, n + 1, input);
+
+    
         // printf("Считанная строка: %s\n", scan);
         // printf("%d %d\n", full_eights, left_over_bites);
+
+        //далее идем по полным байтам и переводим их в числа, потом переводим все, что осталось
         for (int i = 0; i < full_eights * 8; i += 8)
         {
             fprintf(output, "%d ", read_and_convert_full(scan, i));
         }
 
         fprintf(output, "%d", read_and_convert_left_over(scan, left_over_bites, 8 * full_eights));
-
-        // каждый раз когда в си нет функции для упрощения жизни, где-то в нгу грустит одна Юля :(
 
         free(scan);
     }
