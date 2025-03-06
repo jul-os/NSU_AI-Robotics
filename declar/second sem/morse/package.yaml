@@ -37,7 +37,7 @@ library:
   source-dirs: src
   dependencies:
     - base
-    - containers 
+    - containers
 
 executables:
   morse-exe:

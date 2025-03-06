@@ -1,10 +1,9 @@
 name:                telegram-bot
 version:             0.1.0.0
-github:              "githubuser/telegram-bot"
+github:              "declar/second sem/telegram-bot"
 license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2025 Author name here"
+author:              "julosn"
+copyright:           "2025 julosn"
 
 extra-source-files:
 - README.md
@@ -17,7 +16,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/telegram-bot#readme>
+description:         Please see the README on GitHub at <https://github.com/jul-os/NSU_AI-Robotics/blob/main/declar/second%20sem/telegram-bot/README.md>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -35,6 +34,13 @@ ghc-options:
 
 library:
   source-dirs: src
+  dependencies:
+    - base
+    - containers
+    - network
+    - http-client
+    - http-conduit
+    - dotenv
 
 executables:
   telegram-bot-exe:

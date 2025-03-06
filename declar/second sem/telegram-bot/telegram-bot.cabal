@@ -6,12 +6,12 @@ cabal-version: 2.2
 
 name:           telegram-bot
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/telegram-bot#readme>
-homepage:       https://github.com/githubuser/telegram-bot#readme
-bug-reports:    https://github.com/githubuser/telegram-bot/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2025 Author name here
+description:    Please see the README on GitHub at <https://github.com/jul-os/NSU_AI-Robotics/blob/main/declar/second%20sem/telegram-bot/README.md>
+homepage:       https://github.com/declar/second sem#readme
+bug-reports:    https://github.com/declar/second sem/issues
+author:         julosn
+maintainer:     julosn
+copyright:      2025 julosn
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
@@ -21,10 +21,12 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/telegram-bot
+  location: https://github.com/declar/second sem
+  subdir: telegram-bot
 
 library
   exposed-modules:
+      Connection
       Lib
   other-modules:
       Paths_telegram_bot
@@ -34,7 +36,12 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      base
+    , containers
+    , dotenv
+    , http-client
+    , http-conduit
+    , network
   default-language: Haskell2010
 
 executable telegram-bot-exe

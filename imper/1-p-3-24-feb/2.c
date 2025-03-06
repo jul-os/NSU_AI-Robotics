@@ -3,28 +3,22 @@
 #include <stdio.h>
 #include <errno.h>
 
-int find_mod_inverse(int A, int M)
-{
-    if (A == 0)
-    {
-        return -1;
+long long power_mod(long long a, long long b, long long m) {
+    long long res = 1;
+    while (b > 0) {
+        if (b % 2 == 1) // Если текущий бит b == 1
+            res = (res * a) % m;
+        a = (a * a) % m;
+        b /= 2;
     }
-    else
-    {
-        for (int i = 1; i < 100000; i++)
-        {
-            if ( i >= M){
-                return -1;
-            }
-            if ((A * i - 1) % M == 0)
-            {
-                return i;
-            }
-        }
-    }
-    return -1;
+    return res;
 }
 
+int mod_inverse_fermat(int a, int m) {
+    if (a == 0)
+        return -1; 
+    return (int)power_mod(a, m - 2, m); // Малую теорему Ферма
+}
 int main(void)
 {
     FILE *input, *output;
@@ -41,7 +35,7 @@ int main(void)
     for (int i = 0; i < T; i++)
     {
         scanf("%d", &A);
-        B = find_mod_inverse(A, M);
+        B = mod_inverse_fermat(A, M);
         printf("%d\n", B);
     }
 

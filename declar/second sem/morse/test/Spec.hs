@@ -4,6 +4,12 @@ import Data.Char (toLower)
 
 genAlphaString :: Gen String
 genAlphaString = listOf1 $ elements (['a'..'z'] ++ ['A'..'Z'] ++ " ")
+-- тут я при написании  забыла что в алфавите цифры тоже есть
+{-
+listOf1 :: Gen a -> Gen [a]
+
+Generates a non-empty list of random length. The maximum length depends on the size parameter.
+-}
 
 -- перевод строки в Морзе и обратно
 prop_roundTrip :: String -> Bool

@@ -15,17 +15,3 @@ int main(void)
     fclose(output);
     return 0;
 }
-
-// malloc
-/*
-int *x_es = malloc((n + 1) * sizeof(int));
-
-        if (x_es == NULL)
-        {
-            perror("malloc failed");
-            return errno;
-        }
-
-    free(x_es)
-
-*/

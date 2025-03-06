@@ -68,6 +68,15 @@ Type: 	Monad a => (b -> a c) -> [b] -> a [c]-}
 
 morseToChar :: Morse -> Maybe Char
 morseToChar letter = fmap fst $ find ((== letter) . snd) (M.toList morseCodes)
+-- M.toList возвращает пары расшифровка - морзе
+-- ищем чтобы морзе совпадал с нашим
+-- вытаскиваем первый элемент нужной пары
+{-
+Functor — это тип, который позволяет применять функцию к содержимому обёрнутому в какой-то контейнер.
+Пусть есть контейнер с элементом, например, список или Maybe. 
+С помощью Functor можно применить функцию ко всем элементам внутри этого контейнера, не изменяя сам контейнер.
+fmap fst извлекает первый символ из пары, но оборачивает результат в Maybe, чтобы обработать случаи, когда ничего не найдено
+-}
 
 morseToString :: [Morse] -> Maybe String
 morseToString word = if null word then Nothing else mapM morseToChar word
@@ -90,6 +99,8 @@ splitMorse s =
     (morse, ' ' : ' ' : ' ' : rest) -> morse : " " : splitMorse rest -- три пробела пробел в тексте
     (morse, ' ' : rest) -> morse : splitMorse rest -- один пробел новая буква
     (morse, []) -> [morse]
+--- span, applied to a predicate p and a list xs, returns a tuple where first element is the longest prefix 
+--(possibly empty) of xs of elements that satisfy p and second element is the remainder of the list:
 
 decodeToken :: String -> Maybe String
 decodeToken " " = Just " " -- оставляем пробелы между словами

@@ -1,5 +1,5 @@
 module Main (main) where
-
+import System.Environment (getArgs)
 import Morse
 
 convertTo :: IO ()
@@ -44,9 +44,8 @@ convertFrom = do
 -}
 main :: IO ()
 main = do
-    putStrLn "to or from? to change the mode you'll have to run it again, sorry :)"
-    what <- getLine
+    what <- getArgs
     case what of
-        "to" -> convertTo
-        "from" -> convertFrom
+        ["to"] -> convertTo
+        ["from"] -> convertFrom
         _ -> putStrLn "Usage: Main.exe [to|from]"
