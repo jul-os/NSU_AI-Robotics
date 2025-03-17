@@ -41,6 +41,8 @@ library:
     - http-client
     - http-conduit
     - dotenv
+    - bytestring
+    - aeson
 
 executables:
   telegram-bot-exe:

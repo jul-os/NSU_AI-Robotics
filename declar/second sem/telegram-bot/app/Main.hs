@@ -1,6 +1,6 @@
-module Main (main) where
+module Main where
 
-import Lib
+import Connection (getUpdates)
 
 main :: IO ()
-main = someFunc
+main = getUpdates

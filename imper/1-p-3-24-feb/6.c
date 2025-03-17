@@ -46,7 +46,7 @@ long long *facts(long long range, long long module) {
     }
     return res;
 }
-//ответ на запрос О(1)
+//ответ на запрос
 long long C(long long n, long long k, long long module, long long *facts) {
     long long up, down;
     if (n == 0) {

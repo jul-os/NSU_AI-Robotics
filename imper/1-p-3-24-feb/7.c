@@ -26,6 +26,7 @@ int main() {
         // Поиск главного элемента
         int maxRow = i;
         for (int k = i + 1; k < n; k++) {
+            // Функция fabs вычисляет абсолютное значение (модуль) и возвращает его |х|
             if (fabs(a[k][i]) > fabs(a[maxRow][i])) {
                 maxRow = k;
             }

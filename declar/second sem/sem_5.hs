@@ -1,8 +1,11 @@
+{-# LANGUAGE BlockArguments #-}
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Reader
 import qualified Data.Map as M
 import Control.Monad.Trans.Class
+import GHC.Base (undefined)
 
 {-
 Реализуйте функцию paren таким образом, чтобы функция parensMatch, проверяющая правильность 
@@ -128,7 +131,17 @@ instance Show Expr where
     show (Bin op e1 e2) = "(" ++ show e1 ++ show op ++ show e2 ++ ")"
     show (Let x e1 e2) = "(let " ++ x ++ " = " ++ show e1 ++ " in " ++ show e2 ++ ")"
 
+eop :: Op -> Integer -> Integer -> Integer
+eop Div = div
+eop Mul = (*)
+eop Add = (+)
+eop Sub = (-)
 
+name :: Op -> String
+name Div = "div"
+name Add = "add"
+name Sub = "sub"
+name Mul = "mul"
 
 {-
 Для выражений напишите функцию eval, которая
@@ -149,14 +162,43 @@ Nothing
 ghci> runWriter $ runMaybeT (eval12 v)
 (Nothing,"add 2 3;var x is not defined")
 -}
-
-
+-- wont work if for example ... x1 but x1 in not defined 
+-- wont work if division by 0
 eval11 :: Expr -> WriterT String Maybe Integer
-eval11 _ = undefined
+eval11 (Num n) = return n 
+eval11 (Var x) = lift Nothing
+eval11 ( Bin op e1 e2) = do
+    x <- eval11 e1 
+    y <- eval11 e2
+    tell $ name op ++ " " ++ show x ++ " " ++ show y ++ ";"
+    case op of
+        Div -> if y == 0 then lift Nothing else return (div x y)
+        _ -> return (eop op x y)
+        -- в результате maybe снаружи поэтому если где-то будет ошибка просто выведет nothing
+        {-newtype WriterT w m a =
+WriterT { runWriterT :: m (a, w) }-}
+        
+-- сделаем наоборот чтобы можно было посмореть внутренний лог ошибки
+{-
+newtype MaybeT m a =
+MaybeT { runMaybeT :: m (Maybe a) }
+-}
 
+--MaybeT автоматически оборачивает значение в Just.
 eval12 :: Expr -> MaybeT (Writer String) Integer
-eval12 _ = undefined
-
+eval12 (Num n) = return n
+eval12 (Var x) = do
+    lift $ tell ("variable not defined")
+    MaybeT (return Nothing)
+eval12 (Bin op e1 e2) = do
+    x <- eval12 e1
+    y <- eval12 e2
+    lift $ tell (name op ++ " " ++ show x ++ " " ++ show y ++ ";")
+    case op of
+        Div -> if y == 0 
+               then MaybeT (return Nothing) 
+               else return (div x y)
+        _ -> return (eop op x y)
 ---
 {-
 Напишите функцию eval, которая вычисляет значение выражения в **окружении**, **если это возможно**. 
@@ -164,7 +206,28 @@ eval12 _ = undefined
 
 -}
 type Env = M.Map Name Integer
-eval2 = undefined
+eval2 :: Expr -> ReaderT Env Maybe Integer
+eval2 (Num n) = return n
+eval2 (Var x) = do
+    env <- ask
+    case M.lookup x env of
+        Just value -> return value
+        Nothing -> lift Nothing
+eval2 (Bin op e1 e2) = do
+    x <- eval2 e1
+    y <- eval2 e2
+    case op of
+        Div -> if y == 0 then lift Nothing else return (div x y)
+        _ -> return (eop op x y)
+eval2 (Let x e1 e2) = do
+    env <- ask  
+    maybeValue <- eval2 e1  
+    case maybeValue of
+        Nothing -> lift Nothing  -- Если `e1` вернуло `Nothing`, значит ошибка
+        Just value -> 
+            let newEnv = M.insert x value env  
+            in local (const newEnv) (eval2 e2)
+
 
 {-
 Добавьте логгирование к предыдущей функции.
