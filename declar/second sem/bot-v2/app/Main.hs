@@ -186,6 +186,3 @@ run token = do
 
 main :: IO ()
 main = getEnvToken "TELEGRAM_BOT_TOKEN" >>= run
-
--- in bush do
--- export TELEGRAM_BOT_TOKEN="7805803751:AAEEkfOf7v2Ocu_wqHX2CVYJ8XPWF_QkoOE"
