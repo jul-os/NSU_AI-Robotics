@@ -1,3 +1,5 @@
+{-
+
 module Connection where
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -93,3 +95,5 @@ sendMessage token chatId = do
     response <- httpLBS request'
     print $ getResponseBody response
       -- Выводим ответ от Telegram
+
+      -}

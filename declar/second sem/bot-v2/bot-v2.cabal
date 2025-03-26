@@ -4,14 +4,14 @@ cabal-version: 2.2
 --
 -- see: https://github.com/sol/hpack
 
-name:           telegram-bot
+name:           bot-v2
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/jul-os/NSU_AI-Robotics/blob/main/declar/second%20sem/telegram-bot/README.md>
-homepage:       https://github.com/declar/second sem#readme
-bug-reports:    https://github.com/declar/second sem/issues
-author:         julosn
-maintainer:     julosn
-copyright:      2025 julosn
+description:    Please see the README on GitHub at <https://github.com/githubuser/bot-v2#readme>
+homepage:       https://github.com/githubuser/bot-v2#readme
+bug-reports:    https://github.com/githubuser/bot-v2/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2025 Author name here
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Simple
@@ -21,58 +21,65 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/declar/second sem
-  subdir: telegram-bot
+  location: https://github.com/githubuser/bot-v2
 
 library
   exposed-modules:
       Lib
-      Reminder
   other-modules:
-      Paths_telegram_bot
+      Paths_bot_v2
   autogen-modules:
-      Paths_telegram_bot
+      Paths_bot_v2
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      aeson
-    , base
-    , bytestring
-    , containers
-    , envparse
-    , http-client
-    , http-conduit
-    , network
-    , sqlite-simple
+      base >=4.7 && <5
+    , telegram-bot-api
+    , telegram-bot-simple
+    , text
     , time
+    , transformers
+    , unordered-containers
   default-language: Haskell2010
 
-executable telegram-bot-exe
+executable bot-v2-exe
   main-is: Main.hs
   other-modules:
-      Paths_telegram_bot
+      Paths_bot_v2
   autogen-modules:
-      Paths_telegram_bot
+      Paths_bot_v2
   hs-source-dirs:
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , telegram-bot
+    , bot-v2
+    , telegram-bot-api
+    , telegram-bot-simple
+    , text
+    , time
+    , transformers
+    , unordered-containers
   default-language: Haskell2010
 
-test-suite telegram-bot-test
+test-suite bot-v2-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_telegram_bot
+      Paths_bot_v2
   autogen-modules:
-      Paths_telegram_bot
+      Paths_bot_v2
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , telegram-bot
+    , bot-v2
+    , telegram-bot-api
+    , telegram-bot-simple
+    , text
+    , time
+    , transformers
+    , unordered-containers
   default-language: Haskell2010
