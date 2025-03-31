@@ -1,29 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include "primes.h"
-#define SIZE 10000000
+#define SIZE 10000030
 
-int *primes = NULL;
+static int *primes = NULL;
 int count = 0;
-bool *prime = NULL;
-int *sieve_of_eratosthenes()
+int *prime = NULL;
+
+//вызывать решето в каждой функции но создать в ней флаг который поднимается при первом проходе
+//удалить нафиг второй массив
+int flag = 0;
+
+static void sieve_of_eratosthenes()
 {
-    prime = malloc((SIZE + 1) * sizeof(bool));
+    if (flag == 1){
+        return;
+    }
+    prime = malloc((SIZE + 1) * sizeof(int));
     primes = malloc(SIZE * sizeof(int)); // Массив для простых чисел
     if (!prime || !primes)
     {
         printf("Ошибка выделения памяти\n");
         free(prime);
         free(primes);
-        return NULL;
+        return;
     }
 
     for (int i = 0; i <= SIZE; i++)
     {
-        prime[i] = true;
+        prime[i] = 1;
     }
-    prime[0] = prime[1] = false;
+    prime[0] = prime[1] = 0;
 
     for (int p = 2; p * p <= SIZE; p++)
     {
@@ -31,7 +38,7 @@ int *sieve_of_eratosthenes()
         {
             for (int i = p * p; i <= SIZE; i += p)
             {
-                prime[i] = false;
+                prime[i] = 0;
             }
         }
     }
@@ -44,27 +51,14 @@ int *sieve_of_eratosthenes()
             primes[count++] = i;
         }
     }
-    return primes;
+    flag = 1;
+    return;
 }
 
-int binary(int x, bool *arr)
-{
-    int left = 0, right = count - 1;
-    while (left <= right)
-    {
-        int middle = left + (right - left) / 2;
-        if (middle == x)
-            return middle;
-        else if (middle < x)
-            left = middle + 1;
-        else
-            right = middle - 1;
-    }
-}
 
-// returns: 1 if x is prime number, 0 otherwise
 int isPrime(int x)
 {
+    sieve_of_eratosthenes();
     int left = 0, right = count - 1;
     while (left <= right)
     {
@@ -82,6 +76,7 @@ int isPrime(int x)
 // returns minimal prime number p such that p >= x
 int findNextPrime(int x)
 {
+    sieve_of_eratosthenes();
     int left = 0, right = count - 1;
 
     while (left < right)
@@ -100,10 +95,11 @@ int findNextPrime(int x)
 // returns the number of primes x such that l <= x < r
 int getPrimesCount(int l, int r)
 {
+    sieve_of_eratosthenes();
     int c = 0;
     for (int i = l; i < r; i++)
     {
-        if (prime[i] == true)
+        if (prime[i] == 1)
         {
             c++;
         }

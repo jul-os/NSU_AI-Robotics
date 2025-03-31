@@ -20,13 +20,19 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/bot-v2#readme>
 
 dependencies:
-- base >= 4.7 && < 5
-- telegram-bot-api
-- telegram-bot-simple
-- text
-- unordered-containers
-- time
-- transformers
+  - base >= 4.7 && < 5
+  - telegram-bot-simple >= 0.4.5
+  - servant-client
+  - http-client
+  - http-client-tls
+  - mtl
+  - text
+  - time
+  - unordered-containers
+  - stm
+  - transformers
+  - telegram-bot-api
+  - containers
 
 ghc-options:
 - -Wall

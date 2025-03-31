@@ -35,8 +35,14 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers
+    , http-client
+    , http-client-tls
+    , mtl
+    , servant-client
+    , stm
     , telegram-bot-api
-    , telegram-bot-simple
+    , telegram-bot-simple >=0.4.5
     , text
     , time
     , transformers
@@ -55,8 +61,14 @@ executable bot-v2-exe
   build-depends:
       base >=4.7 && <5
     , bot-v2
+    , containers
+    , http-client
+    , http-client-tls
+    , mtl
+    , servant-client
+    , stm
     , telegram-bot-api
-    , telegram-bot-simple
+    , telegram-bot-simple >=0.4.5
     , text
     , time
     , transformers
@@ -76,8 +88,14 @@ test-suite bot-v2-test
   build-depends:
       base >=4.7 && <5
     , bot-v2
+    , containers
+    , http-client
+    , http-client-tls
+    , mtl
+    , servant-client
+    , stm
     , telegram-bot-api
-    , telegram-bot-simple
+    , telegram-bot-simple >=0.4.5
     , text
     , time
     , transformers

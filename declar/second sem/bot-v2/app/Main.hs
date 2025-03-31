@@ -83,11 +83,11 @@ todoBot3 = BotApp
         <|> ShowReminders <$  command "show_reminders" 
     -- Функция для парсинга сообщения с напоминанием в формате "DD.MM HH:MM Text"
     parseReminder :: Text -> ReaderT Update Maybe (Text, UTCTime)
-    parseReminder msg = case Text.splitOn " " msg of
-      [dateStr, timeStr, reminderText] -> case parseTimeM True defaultTimeLocale "%d.%m %H:%M" (Text.unpack (dateStr <> " " <> timeStr)) of
-        Just time -> return (reminderText, time)
-        Nothing   -> empty
-      _ -> empty
+    parseReminder msg = case Text.words msg of
+        (dateStr:timeStr:rest) -> case parseTimeM True defaultTimeLocale "%d.%m %H:%M" (Text.unpack (dateStr <> " " <> timeStr)) of
+            Just time -> return (Text.unwords rest, time)
+            Nothing   -> empty
+        _ -> empty
 
     handleAction :: Action -> Model -> Eff Action Model
     handleAction action model = case action of
@@ -136,16 +136,19 @@ todoBot3 = BotApp
 
 
     startMessage = Text.unlines
-      [ "Hello! I am a Lizard! I will bring you your reminders and TODO lists"
+      [ "Hello! I am a Lizard! I will bring you your REMINDERS and TODO lists"
       , ""
-      , "Here, look at your buttons!"
-      , "You can also use /add command to do that explicitly."
-      , "To remove an item use /remove command."
+      , "Here is how you can work with REMINDERS:"
+      , "1. Use /mkrem command to make a reminder. Remember! You must write them in DD.MM HH:MM Text of reminder style!"
+      , "2. Use /show_reminders command to show a list of your reminders"
+      , "3. If you want to delete a reminder, use /rmrem command with a number of corresponding reminder in the list after it"
       , ""
-      , "You can manage multiple todo lists:"
-      , "Switch to a new named list with /switch_to_list <list>."
-      , "Show all available lists with /show_all."
-      , "Show items for a specific list with /show <list>."
+      , "Here is how you work with TODO lists:"
+      , "1. Use /add to add a new TODO item"
+      , "2. Use /remove to delete a TODO item. Here, you'll have to write it all, sorry :(. The Lizard panicked when it saw your TODO list and forgot how to count"
+      , "3. Switch to a new named list with /switch_to_list <list>."
+      , "4. Show all available lists with /show_all."
+      , "5. Show items for a specific list with /show <list>."
       , ""
       ]
 
@@ -164,6 +167,7 @@ todoBot3 = BotApp
     removeReminderByIdx idx model = model { reminders = take idx (reminders model) ++ drop (idx + 1) (reminders model)}
 
 -- Запуск проверки напоминаний
+{-
 checkReminders :: Model -> Token -> IO ()
 checkReminders model token = forever $ do
   currentTime <- getCurrentTime
@@ -181,11 +185,14 @@ sendReminder token reminder = do
 run :: Token -> IO ()
 run token = do
   env <- defaultTelegramClientEnv token
-  forkIO $ checkReminders initialModel token
+  forkIO $ checkReminders initialMo del token
+  startBot_ (conversationBot updateChatId todoBot3) env
+-}
+
+run :: Token -> IO ()
+run token = do
+  env <- defaultTelegramClientEnv token
   startBot_ (conversationBot updateChatId todoBot3) env
 
 main :: IO ()
 main = getEnvToken "TELEGRAM_BOT_TOKEN" >>= run
-
--- in bush do
--- export TELEGRAM_BOT_TOKEN="7805803751:AAEEkfOf7v2Ocu_wqHX2CVYJ8XPWF_QkoOE"
