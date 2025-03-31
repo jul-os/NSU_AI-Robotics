@@ -195,8 +195,7 @@ run token = do
   startBot_ (conversationBot updateChatId todoBot3) env
 
 main :: IO ()
-<<<<<<< HEAD
-main = getEnvToken "TELEGRAM_BOT_TOKEN" >>= run
-=======
-main = getEnvToken "TELEGRAM_BOT_TOKEN" >>= run
->>>>>>> cc0e06d6b4a1aed7adf5e51e9521a812cd16ce87
+main = do
+  putStrLn "Please, enter Telegram bot's API token:"
+  token <- Token . Text.pack <$> getLine
+  run token
