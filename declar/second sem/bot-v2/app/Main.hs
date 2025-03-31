@@ -102,8 +102,11 @@ todoBot3 = BotApp
             replyText ("Switched to list «" <> name <> "»!") 
             
         ShowAll -> model <# do
-            reply (toReplyMessage "Available todo lists")  -- Отображаем клавиатуру только при необходимости
-                { replyMessageReplyMarkup = Just (SomeInlineKeyboardMarkup listsKeyboard) }
+            let lists = HashMap.keys (todoLists model)
+                listsText = if null lists 
+                           then "No todo lists available" 
+                           else "Available todo lists:\n" <> Text.unlines (map (\name -> "- " <> name) lists)
+            reply (toReplyMessage listsText) { replyMessageReplyMarkup = Nothing }
                 
         Show "" -> model <# do
             return (Show defaultListName)
@@ -128,10 +131,6 @@ todoBot3 = BotApp
 
         _ -> model { pendingAction = Nothing } <# do 
             replyText "Команда не распознана."
-
-        where
-         listsKeyboard = InlineKeyboardMarkup
-            (map (\name -> [actionButton name (Show name)]) (HashMap.keys (todoLists model)))
 
 
 
