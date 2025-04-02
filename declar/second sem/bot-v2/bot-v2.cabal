@@ -36,6 +36,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , cron
     , http-client
     , http-client-tls
     , mtl
@@ -62,6 +63,7 @@ executable bot-v2-exe
       base >=4.7 && <5
     , bot-v2
     , containers
+    , cron
     , http-client
     , http-client-tls
     , mtl
@@ -89,6 +91,7 @@ test-suite bot-v2-test
       base >=4.7 && <5
     , bot-v2
     , containers
+    , cron
     , http-client
     , http-client-tls
     , mtl

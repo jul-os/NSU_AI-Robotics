@@ -33,6 +33,7 @@ dependencies:
   - transformers
   - telegram-bot-api
   - containers
+  - cron
 
 ghc-options:
 - -Wall

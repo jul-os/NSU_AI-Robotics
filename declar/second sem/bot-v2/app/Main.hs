@@ -18,7 +18,7 @@ import Telegram.Bot.API (ChatId, updateChatId, SomeChatId (SomeChatId))
 import Telegram.Bot.API
 import Telegram.Bot.Simple
 import Telegram.Bot.Simple.UpdateParser
-import Control.Monad.Reader (ReaderT, runReaderT, lift)
+import Control.Monad.Reader (ReaderT, runReaderT, lift, ask)
 import Text.Read (readMaybe)
 
 type Item = Text
@@ -26,6 +26,7 @@ type Item = Text
 data Reminder = Reminder
   { reminderText :: Text
   , reminderTime :: UTCTime
+  , reminderChatId :: ChatId 
   }
 
 data Model = Model
@@ -52,7 +53,7 @@ data Action
   | SwitchToList Text
   | ShowAll
   | Show Text
-  | AddReminder Text UTCTime
+  | AddReminder Text UTCTime ChatId
   | ShowReminders 
   | DeleteReminder Int
 
@@ -74,18 +75,21 @@ todoBot3 = BotApp
           <|> (Start <$> (command "start" *> lift (updateChatId upd)))
           <|> RemoveItem   <$> command "remove"
           <|> (DeleteReminder <$> (command "rmrem" >>= parseInt))
-          <|> fmap (uncurry AddReminder) (command "mkrem" >>= parseReminder)
+          <|> fmap (\(text, time, cid) -> AddReminder text time cid) (command "mkrem" >>= parseReminderWithChatId)
           <|> SwitchToList <$> command "switch_to_list"
           <|> Show         <$> command "show"
           <|> ShowAll      <$  command "show_all"
           <|> ShowReminders <$  command "show_reminders" 
     -- Функция для парсинга сообщения с напоминанием в формате "DD.MM HH:MM Text"
-    parseReminder :: Text -> ReaderT Update Maybe (Text, UTCTime)
-    parseReminder msg = case Text.words msg of
-        (dateStr:timeStr:rest) -> case parseTimeM True defaultTimeLocale "%d.%m %H:%M" (Text.unpack (dateStr <> " " <> timeStr)) of
-            Just time -> return (Text.unwords rest, time)
-            Nothing   -> empty
-        _ -> empty
+    parseReminderWithChatId :: Text -> ReaderT Update Maybe (Text, UTCTime, ChatId)
+    parseReminderWithChatId msg = do
+        upd <- ask
+        case (Text.words msg, updateChatId upd) of
+            ((dateStr:timeStr:rest), Just cid) -> 
+                case parseTimeM True defaultTimeLocale "%d.%m %H:%M" (Text.unpack (dateStr <> " " <> timeStr)) of
+                    Just time -> return (Text.unwords rest, time, cid)
+                    Nothing -> empty
+            _ -> empty
 
     -- Функция для парсинга числа (индекса)
     parseInt :: Text -> ReaderT Update Maybe Int
@@ -120,8 +124,9 @@ todoBot3 = BotApp
             then reply (toReplyMessage ("The list «" <> name <> "» is empty"))
             else replyText (Text.unlines items)
 
-        AddReminder text time -> model { reminders = reminders model ++ [Reminder text time] } <# do
-            replyText "Reminder added!"    
+        AddReminder text time cid-> model { reminders = reminders model ++ [Reminder text time cid] } <# do
+            replyText "Reminder added!"
+            
 
         DeleteReminder idx -> removeReminderByIdx idx model <# do
             replyText "Reminder removed!" 
@@ -169,7 +174,7 @@ todoBot3 = BotApp
     removeReminderByIdx idx model = model { reminders = take idx (reminders model) ++ drop (idx + 1) (reminders model)}
 
 -- Запуск проверки напоминаний
-{-
+ {-
 checkReminders :: Model -> Token -> IO ()
 checkReminders model token = forever $ do
   currentTime <- getCurrentTime
@@ -177,11 +182,12 @@ checkReminders model token = forever $ do
   mapM_ (\rem -> sendReminder token rem) dueReminders
   threadDelay 60000000  -- 1 минута (60 секунд * 1000000 микросекунд)
 
-sendReminder :: Token -> Reminder -> IO ()
+
+sendReminder :: ChatId -> Token -> Reminder -> IO ()
 sendReminder token reminder = do
   let msg = Text.concat ["Reminder: ", reminderText reminder]
   env <- defaultTelegramClientEnv token
-  _ <- sendMessage env (SendMessage (ChatId "<your-chat-id>") msg Nothing Nothing Nothing)
+  _ <- sendMessage env (sendMessage (SomeChatId chatId) msg Nothing Nothing Nothing)
   putStrLn ("Reminder sent: " <> Text.unpack msg)
 
 run :: Token -> IO ()
