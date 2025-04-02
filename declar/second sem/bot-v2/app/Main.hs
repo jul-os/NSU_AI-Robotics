@@ -5,7 +5,7 @@ module Main where
 
 import Control.Applicative
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Monad (forever, forM_)
+import Control.Monad (forever, forM_, when)
 import Control.Monad.Reader (ReaderT, ask, lift, liftIO, runReaderT)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -180,40 +180,29 @@ todoBot3 =
     removeReminderByIdx :: Int -> Model -> Model
     removeReminderByIdx idx model = model {reminders = take idx (reminders model) ++ drop (idx + 1) (reminders model)}
 
--- Запуск проверки напоминаний
-{--
-checkReminders :: Model -> Token -> BotM ()
-checkReminders model = do
-  now <- liftIO getCurrentTime
-  let due = filter (\r -> reminderTime r <= now) (reminders model)
-  mapM_ sendReminder due
-
-  checkReminders model token = forever $ do
-    currentTime <- liftIO getCurrentTime
-    let (due, upcoming) = span ((<= currentTime) . reminderTime) (reminders model)
-    forM_ due (\rem -> sendReminder rem)
-    liftIO $ threadDelay 1000000  -- Задержка в 1 секунду
-    checkReminders model { reminders = upcoming } token
--}
-{-
-sendReminder :: Reminder -> BotM ()
-sendReminder reminder = do
-  let request =
-        SendMessageRequest
-          { sendMessageChatId = SomeChatId (reminderChatId reminder),
-            sendMessageMessageThreadId = Nothing, -- Не используем треды
-            sendMessageText = "⏰ " <> reminderText reminder
-          }
-  _ <- runTG (sendMessage request)
-  pure ()
--}
-
 checkReminders :: Model -> Token -> IO ()
 checkReminders model token = forever $ do
-    currentTime <- liftIO getCurrentTime
+    currentTime <- getCurrentTime
+    liftIO $ putStrLn $ "[DEBUG] Current UTC time: " ++ show currentTime
+    liftIO $ putStrLn $ "[DEBUG] Next reminder time: " ++ show (map reminderTime (reminders model))
     let (due, upcoming) = span ((<= currentTime) . reminderTime) (reminders model)
-    forM_ due (\rem -> sendReminder token rem)
-    liftIO $ threadDelay 1000000  -- Задержка в 1 секунду
+    
+    -- Отправляем все просроченные напоминания
+    forM_ due $ \rem -> do
+        sendReminder token rem
+        liftIO $ putStrLn $ "[DEBUG] Sending reminder: " 
+        -- Небольшая задержка между отправками, чтобы не спамить
+        threadDelay 500000  -- 0.5 секунды
+    
+    -- Ждём до следующей проверки (ровно минута с момента начала текущей проверки)
+    now <- getCurrentTime
+    let timePassed = realToFrac (diffUTCTime now currentTime) :: Double
+        delayMicroseconds = max 0 (60 - timePassed) * 1000000  -- Оставшееся время до минуты
+    
+    when (delayMicroseconds > 0) $
+        threadDelay (round delayMicroseconds)
+    
+    -- Продолжаем с обновлённой моделью
     checkReminders model { reminders = upcoming } token
 
 sendReminder :: Token -> Reminder -> IO ()
@@ -230,8 +219,13 @@ sendReminder botToken reminder = do
       
 run :: Token -> IO ()
 run token = do
-  env <- defaultTelegramClientEnv token
-  startBot_ (conversationBot updateChatId todoBot3) env
+    env <- defaultTelegramClientEnv token
+    
+    -- Запускаем проверку напоминаний в фоновом потоке
+    _ <- forkIO $ checkReminders initialModel token
+    
+    -- Запускаем основного бота в основном потоке
+    startBot_ (conversationBot updateChatId todoBot3) env
 
 main :: IO ()
 main = do
