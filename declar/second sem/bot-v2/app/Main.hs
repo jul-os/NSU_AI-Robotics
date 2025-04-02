@@ -5,7 +5,7 @@ module Main where
 
 import Control.Applicative
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Monad (forever)
+import Control.Monad (forever, forM_)
 import Control.Monad.Reader (ReaderT, ask, lift, liftIO, runReaderT)
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
@@ -187,6 +187,13 @@ checkReminders model = do
   now <- liftIO getCurrentTime
   let due = filter (\r -> reminderTime r <= now) (reminders model)
   mapM_ sendReminder due
+
+  checkReminders model token = forever $ do
+    currentTime <- liftIO getCurrentTime
+    let (due, upcoming) = span ((<= currentTime) . reminderTime) (reminders model)
+    forM_ due (\rem -> sendReminder rem)
+    liftIO $ threadDelay 1000000  -- Задержка в 1 секунду
+    checkReminders model { reminders = upcoming } token
 -}
 {-
 sendReminder :: Reminder -> BotM ()
@@ -200,6 +207,15 @@ sendReminder reminder = do
   _ <- runTG (sendMessage request)
   pure ()
 -}
+
+checkReminders :: Model -> Token -> IO ()
+checkReminders model token = forever $ do
+    currentTime <- liftIO getCurrentTime
+    let (due, upcoming) = span ((<= currentTime) . reminderTime) (reminders model)
+    forM_ due (\rem -> sendReminder token rem)
+    liftIO $ threadDelay 1000000  -- Задержка в 1 секунду
+    checkReminders model { reminders = upcoming } token
+
 sendReminder :: Token -> Reminder -> IO ()
 sendReminder botToken reminder = do
   let request = SendMessageRequest
@@ -208,10 +224,10 @@ sendReminder botToken reminder = do
         -- All other fields as Nothing
         }
   env <- defaultTelegramClientEnv botToken
-  result <- runClientM (sendMessage request) env
-  case result of
-      Left err -> putStrLn $ "Ошибка отправки: " ++ show err
-      Right _ -> pure ()
+  _ <- runClientM (sendMessage request) env
+  pure ()
+
+      
 run :: Token -> IO ()
 run token = do
   env <- defaultTelegramClientEnv token
