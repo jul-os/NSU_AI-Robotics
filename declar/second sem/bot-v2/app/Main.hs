@@ -14,10 +14,11 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Time.Clock
 import Data.Time.Format
+import Telegram.Bot.API (ChatId, updateChatId, SomeChatId (SomeChatId))
 import Telegram.Bot.API
 import Telegram.Bot.Simple
 import Telegram.Bot.Simple.UpdateParser
-import Control.Monad.Trans.Reader (ReaderT)
+import Control.Monad.Reader (ReaderT, runReaderT, lift)
 import Text.Read (readMaybe)
 
 type Item = Text
@@ -45,7 +46,7 @@ initialModel = Model
   }
 
 data Action
-  = Start
+  = Start ChatId
   | AddItem Item
   | RemoveItem Item
   | SwitchToList Text
@@ -54,13 +55,8 @@ data Action
   | AddReminder Text UTCTime
   | ShowReminders 
   | DeleteReminder Int
-  deriving (Show, Read)
 
--- Функция для парсинга числа (индекса)
-parseInt :: Text -> ReaderT Update Maybe Int
-parseInt txt = case readMaybe (Text.unpack txt) of
-  Just n  -> return n  -- Просто возвращаем индекс
-  Nothing -> empty
+
 
 todoBot3 :: BotApp Model Action
 todoBot3 = BotApp
@@ -71,16 +67,18 @@ todoBot3 = BotApp
   }
   where
     updateToAction :: Model -> Update -> Maybe Action
-    updateToAction _ = parseUpdate $
-            AddItem      <$> command "add"
-        <|> Start        <$  command "start"
-        <|> RemoveItem   <$> command "remove"
-        <|> (DeleteReminder <$> (command "rmrem" >>= parseInt)) -- Удаление по номеру будет реализовано в другом месте
-        <|> fmap (uncurry AddReminder) (command "mkrem" >>= parseReminder)
-        <|> SwitchToList <$> command "switch_to_list"
-        <|> Show         <$> command "show"
-        <|> ShowAll      <$  command "show_all"
-        <|> ShowReminders <$  command "show_reminders" 
+    updateToAction _ upd = runReaderT parser upd
+      where
+        parser = 
+              AddItem      <$> command "add"
+          <|> (Start <$> (command "start" *> lift (updateChatId upd)))
+          <|> RemoveItem   <$> command "remove"
+          <|> (DeleteReminder <$> (command "rmrem" >>= parseInt))
+          <|> fmap (uncurry AddReminder) (command "mkrem" >>= parseReminder)
+          <|> SwitchToList <$> command "switch_to_list"
+          <|> Show         <$> command "show"
+          <|> ShowAll      <$  command "show_all"
+          <|> ShowReminders <$  command "show_reminders" 
     -- Функция для парсинга сообщения с напоминанием в формате "DD.MM HH:MM Text"
     parseReminder :: Text -> ReaderT Update Maybe (Text, UTCTime)
     parseReminder msg = case Text.words msg of
@@ -89,15 +87,20 @@ todoBot3 = BotApp
             Nothing   -> empty
         _ -> empty
 
+    -- Функция для парсинга числа (индекса)
+    parseInt :: Text -> ReaderT Update Maybe Int
+    parseInt txt = case readMaybe (Text.unpack txt) of
+      Just n  -> return n  -- Просто возвращаем индекс
+      Nothing -> empty
+
     handleAction :: Action -> Model -> Eff Action Model
     handleAction action model = case action of
+        Start chatId -> model <# do
+            reply (toReplyMessage startMessage)
         AddItem item -> addItem item model <# do
             replyText "Ok, got it!" 
         RemoveItem item -> removeItem item model <# do
             replyText "Item removed!" 
-        Start -> model <# do
-            reply (toReplyMessage startMessage)  -- Проверяем, что кнопки здесь актуальны
-
         SwitchToList name -> model { currentList = name } <# do
             replyText ("Switched to list «" <> name <> "»!") 
             
