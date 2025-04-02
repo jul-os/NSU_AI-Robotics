@@ -16,6 +16,7 @@ import Data.Time.Format
 import Telegram.Bot.API
 import Telegram.Bot.API (ChatId, SomeChatId (SomeChatId), updateChatId)
 import Telegram.Bot.Simple
+import Servant.Client (runClientM)
 import Telegram.Bot.Simple.RunTG
 import Telegram.Bot.Simple.UpdateParser
 import Text.Read (readMaybe)
@@ -187,6 +188,7 @@ checkReminders model = do
   let due = filter (\r -> reminderTime r <= now) (reminders model)
   mapM_ sendReminder due
 -}
+{-
 sendReminder :: Reminder -> BotM ()
 sendReminder reminder = do
   let request =
@@ -197,15 +199,19 @@ sendReminder reminder = do
           }
   _ <- runTG (sendMessage request)
   pure ()
-
-{-
-run :: Token -> IO ()
-run token = do
-  env <- defaultTelegramClientEnv token
-  forkIO $ checkReminders initialModel token
-  startBot_ (conversationBot updateChatId todoBot3) env
 -}
-
+sendReminder :: Token -> Reminder -> IO ()
+sendReminder botToken reminder = do
+  let request = SendMessageRequest
+        { sendMessageChatId = SomeChatId (reminderChatId reminder)
+        , sendMessageText = "⏰ " <> reminderText reminder
+        -- All other fields as Nothing
+        }
+  env <- defaultTelegramClientEnv botToken
+  result <- runClientM (sendMessage request) env
+  case result of
+      Left err -> putStrLn $ "Ошибка отправки: " ++ show err
+      Right _ -> pure ()
 run :: Token -> IO ()
 run token = do
   env <- defaultTelegramClientEnv token
