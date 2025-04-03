@@ -1,22 +1,30 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
 import Control.Applicative
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Monad (forever, forM_, when)
-import Control.Monad.Reader (ReaderT, ask, lift, liftIO, runReaderT)
+import Control.Concurrent.MVar (MVar, modifyMVar_, newMVar, readMVar)
+import Control.Monad (forM_, forever, when)
+import Control.Monad.Reader (ReaderT, ask, asks, lift, liftIO, runReaderT)
+import Data.Functor ((<&>))
 import Data.HashMap.Strict (HashMap)
 import Data.HashMap.Strict qualified as HashMap
+import Data.List (partition)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Time.Format
+import Data.Time.LocalTime
+import Servant.Client (runClientM)
 import Telegram.Bot.API
 import Telegram.Bot.API (ChatId, SomeChatId (SomeChatId), updateChatId)
 import Telegram.Bot.Simple
-import Servant.Client (runClientM)
 import Telegram.Bot.Simple.RunTG
 import Telegram.Bot.Simple.UpdateParser
 import Text.Read (readMaybe)
@@ -33,18 +41,21 @@ data Model = Model
   { todoLists :: HashMap Text [Item],
     currentList :: Text,
     pendingAction :: Maybe Action,
-    reminders :: [Reminder]
+    reminders :: [Reminder],
+    botToken :: Token
   }
 
 defaultListName :: Text
 defaultListName = "Default"
 
-initialModel =
+initialModel :: Token -> Model
+initialModel token =
   Model
     { todoLists = HashMap.fromList [(defaultListName, [])],
       currentList = defaultListName,
       pendingAction = Nothing,
-      reminders = []
+      reminders = [],
+      botToken = token
     }
 
 data Action
@@ -58,15 +69,103 @@ data Action
   | ShowReminders
   | DeleteReminder Int
 
-todoBot3 :: BotApp Model Action
-todoBot3 =
-  BotApp
-    { botInitialModel = initialModel,
-      botAction = flip updateToAction,
-      botHandler = handleAction,
-      botJobs = []
-    }
+todoBot3 :: Token -> IO (BotApp Model Action)
+todoBot3 token = do
+  stateVar <- newMVar (initialModel token)
+
+  -- Запускаем фоновый поток для проверки напоминаний
+  forkIO $ reminderCheckerThread stateVar token
+
+  return $
+    BotApp
+      { botInitialModel = initialModel token,
+        botAction = flip updateToAction,
+        botHandler = handleAction stateVar,
+        botJobs = []
+      }
   where
+    reminderCheckerThread :: MVar Model -> Token -> IO ()
+    reminderCheckerThread stateVar token = forever $ do
+      currentTime <- getCurrentTime
+      model <- readMVar stateVar
+
+      -- Вывод времени и текущих напоминаний для отладки
+      putStrLn $ "Current time: " <> formatTime defaultTimeLocale "%d.%m %H:%M:%S" currentTime
+      putStrLn "Current reminders:"
+      forM_ (zip [0 ..] (reminders model)) $ \(i, Reminder {..}) -> do
+        putStrLn $ show i <> ": " <> Text.unpack reminderText <> " at " <> formatTime defaultTimeLocale "%d.%m %H:%M:%S" reminderTime
+
+      let (due, upcoming) = span ((<= currentTime) . reminderTime) (reminders model)
+
+      forM_ due $ \rem -> do
+        sendReminder token rem
+        threadDelay 500000
+
+      modifyMVar_ stateVar $ \m ->
+        return m {reminders = upcoming}
+
+      now <- getCurrentTime
+      let timePassed = diffUTCTime now currentTime
+          delay = max 0 (60 - realToFrac timePassed)
+      threadDelay (round $ delay * 1000000)
+
+    handleAction :: MVar Model -> Action -> Model -> Eff Action Model
+    handleAction stateVar action model = case action of
+      AddReminder text time chatId ->
+        model <# do
+          let newReminder = Reminder text time chatId
+          liftIO $ modifyMVar_ stateVar $ \m ->
+            return m {reminders = newReminder : reminders m}
+          replyText "Добавила!"
+      DeleteReminder idx ->
+        model <# do
+          liftIO $ modifyMVar_ stateVar $ \m ->
+            return $ removeReminderByIdx idx m
+          replyText "Удалила!"
+      ShowReminders ->
+        model <# do
+          m <- liftIO $ readMVar stateVar
+          let reminderTexts = map (\(i, reminder) -> Text.pack (show i) <> ": " <> reminderText reminder <> " at " <> (Text.pack $ formatTime defaultTimeLocale "%d.%m %H:%M" (reminderTime reminder))) (zip [0 ..] (reminders m))
+          if null reminderTexts
+            then replyText "Напоминаний нет 🤷"
+            else replyText (Text.unlines reminderTexts)
+      _ -> defaultHandler action model
+
+    defaultHandler :: Action -> Model -> Eff Action Model
+    defaultHandler action model = case action of
+      Start chatId ->
+        model <# do
+          reply (toReplyMessage startMessage)
+      AddItem item ->
+        addItem item model <# do
+          replyText "Оки!"
+      RemoveItem item ->
+        removeItem item model <# do
+          replyText "Удалила!"
+      SwitchToList name ->
+        model {currentList = name} <# do
+          replyText ("Переключаемся на список «" <> name <> "»!")
+      ShowAll ->
+        model <# do
+          let lists = HashMap.keys (todoLists model)
+              listsText =
+                if null lists
+                  then "Списков дел нет 🤷"
+                  else "Твои списки дел:\n" <> Text.unlines (map (\name -> "- " <> name) lists)
+          reply (toReplyMessage listsText) {replyMessageReplyMarkup = Nothing}
+      Show "" ->
+        model <# do
+          return (Show defaultListName)
+      Show name ->
+        model <# do
+          let items = concat (HashMap.lookup name (todoLists model))
+          if null items
+            then reply (toReplyMessage ("The list «" <> name <> "» is empty"))
+            else replyText (Text.unlines items)
+      _ ->
+        model {pendingAction = Nothing} <# do
+          replyText "Команда не распознана."
+
     updateToAction :: Model -> Update -> Maybe Action
     updateToAction _ upd = runReaderT parser upd
       where
@@ -80,155 +179,97 @@ todoBot3 =
             <|> Show <$> command "show"
             <|> ShowAll <$ command "show_all"
             <|> ShowReminders <$ command "show_reminders"
-    -- Функция для парсинга сообщения с напоминанием в формате "DD.MM HH:MM Text"
+
     parseReminderWithChatId :: Text -> ReaderT Update Maybe (Text, UTCTime, ChatId)
     parseReminderWithChatId msg = do
       upd <- ask
       case (Text.words msg, updateChatId upd) of
-        ((dateStr : timeStr : rest), Just cid) ->
-          case parseTimeM True defaultTimeLocale "%d.%m %H:%M" (Text.unpack (dateStr <> " " <> timeStr)) of
+        ((dateStr : timeStr : rest), Just cid) -> do
+          let currentYear = 2025
+              timeStrWithYear = dateStr <> " " <> timeStr <> " " <> Text.pack (show currentYear)
+          case parseTimeM True defaultTimeLocale "%d.%m %H:%M %Y" (Text.unpack timeStrWithYear) of
             Just time -> return (Text.unwords rest, time, cid)
             Nothing -> empty
         _ -> empty
 
-    -- Функция для парсинга числа (индекса)
     parseInt :: Text -> ReaderT Update Maybe Int
     parseInt txt = case readMaybe (Text.unpack txt) of
-      Just n -> return n -- Просто возвращаем индекс
+      Just n -> return n
       Nothing -> empty
-
-    handleAction :: Action -> Model -> Eff Action Model
-    handleAction action model = case action of
-      Start chatId ->
-        model <# do
-          reply (toReplyMessage startMessage)
-      AddItem item ->
-        addItem item model <# do
-          replyText "Ok, got it!"
-      RemoveItem item ->
-        removeItem item model <# do
-          replyText "Item removed!"
-      SwitchToList name ->
-        model {currentList = name} <# do
-          replyText ("Switched to list «" <> name <> "»!")
-      ShowAll ->
-        model <# do
-          let lists = HashMap.keys (todoLists model)
-              listsText =
-                if null lists
-                  then "No todo lists available"
-                  else "Available todo lists:\n" <> Text.unlines (map (\name -> "- " <> name) lists)
-          reply (toReplyMessage listsText) {replyMessageReplyMarkup = Nothing}
-      Show "" ->
-        model <# do
-          return (Show defaultListName)
-      Show name ->
-        model <# do
-          let items = concat (HashMap.lookup name (todoLists model))
-          if null items
-            then reply (toReplyMessage ("The list «" <> name <> "» is empty"))
-            else replyText (Text.unlines items)
-      AddReminder text time cid ->
-        model {reminders = reminders model ++ [Reminder text time cid]} <# do
-          replyText "Reminder added!"
-      DeleteReminder idx ->
-        removeReminderByIdx idx model <# do
-          replyText "Reminder removed!"
-      ShowReminders ->
-        model <# do
-          let reminderTexts = map (\(i, reminder) -> Text.pack (show i) <> ": " <> reminderText reminder <> " at " <> (Text.pack $ formatTime defaultTimeLocale "%d.%m %H:%M" (reminderTime reminder))) (zip [0 ..] (reminders model))
-          if null reminderTexts
-            then replyText "You have no reminders."
-            else replyText (Text.unlines reminderTexts)
-      _ ->
-        model {pendingAction = Nothing} <# do
-          replyText "Команда не распознана."
 
     startMessage =
       Text.unlines
-        [ "Hello! I am a Lizard! I will bring you your REMINDERS and TODO lists",
-          "",
-          "Here is how you can work with REMINDERS:",
-          "1. Use /mkrem command to make a reminder. Remember! You must write them in DD.MM HH:MM Text of reminder style!",
-          "2. Use /show_reminders command to show a list of your reminders",
-          "3. If you want to delete a reminder, use /rmrem command with a number of corresponding reminder in the list after it",
-          "",
-          "Here is how you work with TODO lists:",
-          "1. Use /add to add a new TODO item",
-          "2. Use /remove to delete a TODO item. Here, you'll have to write it all, sorry :(. The Lizard panicked when it saw your TODO list and forgot how to count",
-          "3. Switch to a new named list with /switch_to_list <list>.",
-          "4. Show all available lists with /show_all.",
-          "5. Show items for a specific list with /show <list>.",
-          ""
+        [ Text.pack "Приветик! Я ящерка. Я буду приносить тебе напоминания и списки дел.",
+          Text.pack "",
+          Text.pack "Вот как ты можешь работать с НАПОМИНАНИЯМИ:",
+          Text.pack "1. Напиши /mkrem, чтобы поставить напоминание. Помни! Напомиинания нужно поставить в виде DD.MM HH:MM Текст.",
+          Text.pack "Я пока умею работать только с UTC временем :)",
+          Text.pack "2. Напиши /show_reminders, чтобы посмотреть на список твоих напоминаний",
+          Text.pack "3. Если хочешь удалить напоминание, напиши /rmrem и номер соответствующего напоминания в списке",
+          Text.pack "",
+          Text.pack "Вот так ты можешь работать с СПИСКАМИ ДЕЛ:",
+          Text.pack "1. Напиши /add, чтобы добавить дело в твой список",
+          Text.pack "2. Напиши /remove, чтобы удалить дело. Тут придется полностью написать его, извини :( Ящерица испугалась и забыла, как считать",
+          Text.pack "3. Напиши switch_to_list <list>, чтобы переключиться между списками дел",
+          Text.pack "4. Напиши /show_all, чтобы увидеть названия всех своих списков",
+          Text.pack "5. Напиши /show <list>, чтобы посмотреть содержимое конкретного списка.",
+          Text.pack ""
         ]
 
-    -- Добавление элемента в список
+
     addItem :: Item -> Model -> Model
     addItem item model =
       model
         { todoLists = HashMap.insertWith (++) (currentList model) [item] (todoLists model)
         }
 
-    -- Удаление элемента из списка
     removeItem :: Item -> Model -> Model
     removeItem item model =
       model
         { todoLists = HashMap.adjust (filter (/= item)) (currentList model) (todoLists model)
         }
 
-    -- Удаление напоминания по индексу
     removeReminderByIdx :: Int -> Model -> Model
     removeReminderByIdx idx model = model {reminders = take idx (reminders model) ++ drop (idx + 1) (reminders model)}
 
-checkReminders :: Model -> Token -> IO ()
-checkReminders model token = forever $ do
-    currentTime <- getCurrentTime
-    liftIO $ putStrLn $ "[DEBUG] Current UTC time: " ++ show currentTime
-    liftIO $ putStrLn $ "[DEBUG] Next reminder time: " ++ show (map reminderTime (reminders model))
-    let (due, upcoming) = span ((<= currentTime) . reminderTime) (reminders model)
-    
-    -- Отправляем все просроченные напоминания
-    forM_ due $ \rem -> do
-        sendReminder token rem
-        liftIO $ putStrLn $ "[DEBUG] Sending reminder: " 
-        -- Небольшая задержка между отправками, чтобы не спамить
-        threadDelay 500000  -- 0.5 секунды
-    
-    -- Ждём до следующей проверки (ровно минута с момента начала текущей проверки)
-    now <- getCurrentTime
-    let timePassed = realToFrac (diffUTCTime now currentTime) :: Double
-        delayMicroseconds = max 0 (60 - timePassed) * 1000000  -- Оставшееся время до минуты
-    
-    when (delayMicroseconds > 0) $
-        threadDelay (round delayMicroseconds)
-    
-    -- Продолжаем с обновлённой моделью
-    checkReminders model { reminders = upcoming } token
-
+{-
 sendReminder :: Token -> Reminder -> IO ()
 sendReminder botToken reminder = do
-  let request = SendMessageRequest
-        { sendMessageChatId = SomeChatId (reminderChatId reminder)
-        , sendMessageText = "⏰ " <> reminderText reminder
-        -- All other fields as Nothing
-        }
+  let request =
+        SendMessageRequest
+          { sendMessageChatId = SomeChatId (reminderChatId reminder),
+            sendMessageText = "⏰ " <> reminderText reminder
+          }
+  env <- defaultTelegramClientEnv botToken
+  _ <- runClientM (sendMessage request) env
+  pure ()
+-}
+sendReminder :: Token -> Reminder -> IO ()
+sendReminder botToken reminder = do
+  let request =
+        SendMessageRequest
+          { sendMessageBusinessConnectionId = Nothing,
+            sendMessageChatId = SomeChatId (reminderChatId reminder),
+            sendMessageMessageThreadId = Nothing,
+            sendMessageText = "⏰ " <> reminderText reminder,
+            sendMessageParseMode = Nothing,
+            sendMessageEntities = Nothing,
+            sendMessageLinkPreviewOptions = Nothing,
+            sendMessageDisableNotification = Nothing,
+            sendMessageProtectContent = Nothing,
+            sendMessageMessageEffectId = Nothing,
+            sendMessageReplyToMessageId = Nothing,
+            sendMessageReplyParameters = Nothing,
+            sendMessageReplyMarkup = Nothing
+          }
   env <- defaultTelegramClientEnv botToken
   _ <- runClientM (sendMessage request) env
   pure ()
 
-      
-run :: Token -> IO ()
-run token = do
-    env <- defaultTelegramClientEnv token
-    
-    -- Запускаем проверку напоминаний в фоновом потоке
-    _ <- forkIO $ checkReminders initialModel token
-    
-    -- Запускаем основного бота в основном потоке
-    startBot_ (conversationBot updateChatId todoBot3) env
-
 main :: IO ()
 main = do
-  putStrLn "Please, enter Telegram bot's API token:"
+  putStrLn "Enter bot token:"
   token <- Token . Text.pack <$> getLine
-  run token
+  app <- todoBot3 token
+  env <- defaultTelegramClientEnv token
+  startBot_ (conversationBot updateChatId app) env

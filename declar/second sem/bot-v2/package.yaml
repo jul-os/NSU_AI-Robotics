@@ -21,7 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base >= 4.7 && < 5
-  - telegram-bot-simple >= 0.4.5
+  - telegram-bot-simple
   - servant-client
   - http-client
   - http-client-tls
@@ -31,9 +31,10 @@ dependencies:
   - unordered-containers
   - stm
   - transformers
-  - telegram-bot-api
+  - telegram-bot-api >= 0.7
   - containers
   - cron
+  - lens
 
 ghc-options:
 - -Wall
