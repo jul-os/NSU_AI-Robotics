@@ -1,19 +1,18 @@
 module WolfsAndSheep where
-import Control.Monad.IO.Class 
+
 import Control.Monad
+import Control.Monad.Except
+import Control.Monad.IO.Class
+import Control.Monad.Identity
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Writer
-import Control.Monad.Except
 import Control.Monad.Writer
-import Control.Monad.Trans.Class (lift)
-import System.Random
-import Control.Monad.Identity
 import Data.Char
-import Data.Maybe (fromMaybe)
 import Data.List (find, nub)
+import Data.Maybe (fromMaybe)
 import Debug.Trace (trace)
-
-
+import System.Random
 
 -- Положение на доске
 data Position = Position {f :: Char, r :: Int}
@@ -62,7 +61,8 @@ startSheep = Position 'a' 1
 
 startWolfs :: [Position]
 startWolfs = [Position f 8 | f <- "bdfh"]
-        --[Position 'a' 3, Position 'b' 4, Position 'd' 2, Position 'c' 1]
+
+-- [Position 'a' 3, Position 'b' 4, Position 'd' 2, Position 'c' 1]
 
 startGame :: Game
 startGame = Game startSheep startWolfs
@@ -99,203 +99,227 @@ possibleWolfsSteps game =
       abs (xs - x) == 1,
       y == ys - 1,
       even (x + y),
-      --coordsToPos (x, y) /= sheep game 
-      --я три часа искала почему волки не побеждают а оказалось им надо смотреть что они не наступают на овцу только после хода овцы
+      -- coordsToPos (x, y) /= sheep game
+      -- я три часа искала почему волки не побеждают а оказалось им надо смотреть что они не наступают на овцу только после хода овцы
       coordsToPos (x, y) `notElem` wolfs game
   ]
 
 doPossibleWolfsSteps :: Game -> [Step]
 doPossibleWolfsSteps game = do
-        wolfPos <- wolfs game --а тут оно и без нас список видимо и все норм
-        let (xs, ys) = posToCoords wolfPos
-        let y = ys - 1
-        x <- [1..8]
-        guard ( abs (x-xs) == 1 && even (x + y)  && coordsToPos (x, y) `notElem` wolfs game && y>= 1 && y <= 8)
-        return Step {from = wolfPos, to = coordsToPos (x, y)}
+  wolfPos <- wolfs game -- а тут оно и без нас список видимо и все норм
+  let (xs, ys) = posToCoords wolfPos
+  let y = ys - 1
+  x <- [1 .. 8]
+  guard (abs (x - xs) == 1 && even (x + y) && coordsToPos (x, y) `notElem` wolfs game && y >= 1 && y <= 8)
+  return Step {from = wolfPos, to = coordsToPos (x, y)}
 
 -- Если у игрока несколько доступных ходов, выбирайте первый из доступных.
 -- сначала ходит овца
 
 simpleTurn :: Game -> Either GameResult Game
-simpleTurn game = 
-        let 
-                sheepTurn = possibleSheepSteps game
-                wolvesTurn = possibleWolfsSteps game
-        in case (sheepTurn, wolvesTurn) of
-                ([], _) -> Left WolfsWin
-                (_, []) -> Left SheepWin
-                _ -> Right (updateGame game sheepTurn wolvesTurn)
-
+simpleTurn game =
+  let sheepTurn = possibleSheepSteps game
+      wolvesTurn = possibleWolfsSteps game
+   in case (sheepTurn, wolvesTurn) of
+        ([], _) -> Left WolfsWin
+        (_, []) -> Left SheepWin
+        _ -> Right (updateGame game sheepTurn wolvesTurn)
 
 updateGame :: Game -> [Step] -> [Step] -> Game
 updateGame game sheepTurn wolvesTurn =
-  let newSheepPos = to (head sheepTurn)  -- Овца делает первый доступный ход
-      chosenWolfStep = find (\s -> from s `elem` wolfs game && to s /= newSheepPos) wolvesTurn  -- Находим первый ход для любого волка
+  let newSheepPos = to (head sheepTurn) -- Овца делает первый доступный ход
+      chosenWolfStep = find (\s -> from s `elem` wolfs game && to s /= newSheepPos) wolvesTurn -- Находим первый ход для любого волка
+      -- сравниваем что волк не наступает на овцу
       newWolvesPos = case chosenWolfStep of
-        Just step -> [if w == from step then to step else w | w <- wolfs game]  -- Один волк ходит, остальные остаются
-        Nothing -> wolfs game  -- Если нет ходов, все волки остаются на месте
-  in game {sheep = newSheepPos, wolfs = newWolvesPos}
+        Just step -> [if w == from step then to step else w | w <- wolfs game] -- Один волк ходит, остальные остаются
+        -- w будет перебирать позиции волков
+        --Если текущая позиция волка w совпадает с исходной позицией ходящего волка (from step), то заменяем её на целевую позицию (to step)
+        -- инчае пусть стоит там
+        Nothing -> wolfs game -- Если нет ходов, все волки остаются на месте
+   in game {sheep = newSheepPos, wolfs = newWolvesPos}
 
-run :: Monad m => (a -> m a) -> a -> m a
+
+-- рекурсивно выполняем какую-то монадическую фукнцию
+run :: (Monad m) => (a -> m a) -> a -> m a
 run f x = (run f) =<< (f x)
+-- обратный bind 
+-- (=<<) :: (Monad m) => (a -> m b) -> m a -> m b
 
+
+-- Т потому что трансформеры и они нужны чтобы наслаивать монады друг на друга
+-- writer потому что хотим логи
+-- either потому что GameResult так работает
 loggedTurn :: Game -> WriterT [Step] (Either GameResult) Game
 loggedTurn (Game sheep wolves) = do
-    let sheeps = possibleSheepSteps (Game sheep wolves)
-    case sheeps of
-        [] -> do
-            Control.Monad.Writer.tell []
-            lift (Left WolfsWin)
-        (Step _ (Position sx sy)): _ -> do
-            Control.Monad.Writer.tell [head sheeps]
-            if sy == 8
-                then do
-                    Control.Monad.Writer.tell []
-                    lift (Left SheepWin)
-                else do
-                    -- Проверяем волков
-                    let wolvess = possibleWolfsSteps (Game (Position sx sy) wolves)
-                    case wolvess of
-                        [] -> do
-                            Control.Monad.Writer.tell []
-                            lift (Left SheepWin)
-                        (Step (Position wx wy) (Position wxn wyn)): _ -> do
-                            Control.Monad.Writer.tell [head wolvess]
-                            lift (Right (Game (Position sx sy) ((Position wxn wyn) : filter (/= (Position wx wy)) wolves)))
-
+  let sheeps = possibleSheepSteps (Game sheep wolves)
+  case sheeps of
+    [] -> do
+      Control.Monad.Writer.tell []
+      --значит в лог мы ничего не добавили потому что ходов нет
+      lift (Left WolfsWin)
+      -- но подняли вывод GameResult от того что игра завершилась
+    (Step _ (Position sx sy)) : _ -> do
+      -- значит ходим по первому возможному да
+      -- и тут смотрим на то что происходит после этого хода
+      Control.Monad.Writer.tell [head sheeps]
+      --выводим ход
+      if sy == 8
+        -- овечка пришла к концу доски
+        then do
+          Control.Monad.Writer.tell []
+          lift (Left SheepWin)
+        else do
+          -- Проверяем волков
+          let wolvess = possibleWolfsSteps (Game (Position sx sy) wolves)
+          -- тут уже берем позицию овечки на которую она сходила
+          case wolvess of
+            [] -> do
+              Control.Monad.Writer.tell []
+              lift (Left SheepWin)
+            (Step (Position wx wy) (Position wxn wyn)) : _ -> do
+              -- опять берем первый ход из списка возможных и пишем его в лог
+              Control.Monad.Writer.tell [head wolvess]
+              lift (Right (Game (Position sx sy) ((Position wxn wyn) : filter (/= (Position wx wy)) wolves)))
+              -- поднимаем новое состояние игры куда мы записали ход овечки, ход волка и позиции остальных волков которые остались на месте
 
 loggedTurn' :: Game -> ExceptT GameResult (Writer [Step]) Game
+--типа так же но в другую сторону
 loggedTurn' (Game sheep wolves) = do
-        let sheeps = possibleSheepSteps (Game sheep wolves)
-        case sheeps of
-                [] -> do
-                        lift (Control.Monad.Writer.tell [])
-                        throwE WolfsWin
-                (Step _ (Position sx sy)): _ -> do
-                        lift (Control.Monad.Writer.tell [head sheeps])
-                        if sy == 8
-                        then do
-                                lift (Control.Monad.Writer.tell [])
-                                throwE SheepWin
-                        else do
-                                -- Проверяем волков
-                                let wolvess = possibleWolfsSteps (Game (Position sx sy) wolves)
-                                case wolvess of
-                                        [] -> do
-                                                lift (Control.Monad.Writer.tell [])
-                                                throwE SheepWin
-                                        (Step (Position wx wy) (Position wxn wyn)): _ -> do
-                                                lift (Control.Monad.Writer.tell [head wolvess])
-                                                return (Game (Position sx sy) ((Position wxn wyn) : filter (/= (Position wx wy)) wolves))
-
+  let sheeps = possibleSheepSteps (Game sheep wolves)
+  case sheeps of
+    [] -> do
+      lift (Control.Monad.Writer.tell [])
+      throwE WolfsWin
+    (Step _ (Position sx sy)) : _ -> do
+      lift (Control.Monad.Writer.tell [head sheeps])
+      if sy == 8
+        then do
+          lift (Control.Monad.Writer.tell [])
+          throwE SheepWin
+        else do
+          -- Проверяем волков
+          let wolvess = possibleWolfsSteps (Game (Position sx sy) wolves)
+          case wolvess of
+            [] -> do
+              lift (Control.Monad.Writer.tell [])
+              throwE SheepWin
+            (Step (Position wx wy) (Position wxn wyn)) : _ -> do
+              lift (Control.Monad.Writer.tell [head wolvess])
+              return (Game (Position sx sy) ((Position wxn wyn) : filter (/= (Position wx wy)) wolves))
 
 randomElement :: [a] -> IO (Maybe a)
 randomElement [] = return Nothing
 randomElement xs = do
-    idx <- randomRIO (0, length xs - 1)  
-    return (Just (xs !! idx))
+  idx <- randomRIO (0, length xs - 1)
+  return (Just (xs !! idx))
 
-newtype MyMonad a = MyMonad { runMyMonad :: ExceptT GameResult (WriterT [Step] IO) a }
-    deriving (Functor, Applicative, Monad, MonadIO, MonadError GameResult, MonadWriter [Step])
+newtype MyMonad a = MyMonad {runMyMonad :: ExceptT GameResult (WriterT [Step] IO) a}
+-- автоматические инстансы
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError GameResult, MonadWriter [Step])
+-- без этого ужаса не получлось почему-то я хз
+{-
+IO - ввод-вывод. рандомные числа потому что функция сверху на нем построена + взаимод с пользов
+WriterT [Step] - поверх IO: добавляет логгирование (список ходов)
+ExceptT GameResult - верхний слой: добавляет возможность раннего прекращения с результатом игры
+-}
 
-
+--litIO Поднимает IO-действие через весь стек трансформеров.
 randomGame :: Game -> MyMonad Game
 randomGame game = do
-    liftIO (putStrLn (show game))
-    let sheeps = possibleSheepSteps game
-    case sheeps of
-        [] -> do
-            liftIO (putStrLn "No possible steps for the sheep!")
-            throwError WolfsWin 
-        _ -> do
-            sheepStep <- liftIO (randomElement sheeps)
-            case sheepStep of
-                Nothing -> do
-                    liftIO (putStrLn "No random step for the sheep!")
-                    throwError WolfsWin
-                Just (Step _ (Position sx sy)) -> do
-                    Control.Monad.Writer.tell [head sheeps]
-                    if sy == 8
-                    then do
-                        liftIO (putStrLn "Sheep reached the end!")
-                        throwError SheepWin
-                    else do
-                        let wolvess = possibleWolfsSteps (Game (Position sx sy) (wolfs game))
-                        case wolvess of
-                            [] -> do
-                                liftIO (putStrLn "No possible steps for the wolves!")
-                                throwError SheepWin
-                            _ -> do
-                                wolfStep <- liftIO (randomElement wolvess)
-                                case wolfStep of
-                                    Nothing -> do
-                                        liftIO (putStrLn "No random step for the wolves!")
-                                        throwError SheepWin
-                                    Just (Step (Position wf wr) (Position wfn wrn)) -> do
-                                        Control.Monad.Writer.tell [Step (Position wf wr) (Position wfn wrn)]  
-                                        -- рекурсия потому что я устала думать и не хочу писать состояния
-                                        randomGame (Game (Position sx sy) ((Position wfn wrn) : filter (/= (Position wf wr)) (wolfs game)))
-
+  liftIO (putStrLn (show game))
+  let sheeps = possibleSheepSteps game
+  case sheeps of
+    [] -> do
+      liftIO (putStrLn "No possible steps for the sheep!")
+      throwError WolfsWin
+    _ -> do
+      sheepStep <- liftIO (randomElement sheeps)
+      case sheepStep of
+        Nothing -> do
+          liftIO (putStrLn "No random step for the sheep!")
+          throwError WolfsWin
+        Just (Step _ (Position sx sy)) -> do
+          Control.Monad.Writer.tell [head sheeps]
+          if sy == 8
+            then do
+              liftIO (putStrLn "Sheep reached the end!")
+              throwError SheepWin
+            else do
+              let wolvess = possibleWolfsSteps (Game (Position sx sy) (wolfs game))
+              case wolvess of
+                [] -> do
+                  liftIO (putStrLn "No possible steps for the wolves!")
+                  throwError SheepWin
+                _ -> do
+                  wolfStep <- liftIO (randomElement wolvess)
+                  case wolfStep of
+                    Nothing -> do
+                      liftIO (putStrLn "No random step for the wolves!")
+                      throwError SheepWin
+                    Just (Step (Position wf wr) (Position wfn wrn)) -> do
+                      Control.Monad.Writer.tell [Step (Position wf wr) (Position wfn wrn)]
+                      -- рекурсия потому что я устала думать и не хочу писать состояния
+                      randomGame (Game (Position sx sy) ((Position wfn wrn) : filter (/= (Position wf wr)) (wolfs game)))
 
 runRandGame :: Game -> IO ()
 runRandGame game = do
-    result <- runWriterT (runExceptT (runMyMonad (randomGame game))) 
-    let (finalGame, logSteps) = result  
-    putStrLn "Game result:"
-    print finalGame  
-    putStrLn "Log of steps:"
-    mapM_ (putStrLn . show) logSteps
+  result <- runWriterT (runExceptT (runMyMonad (randomGame game)))
+  let (finalGame, logSteps) = result
+  putStrLn "Game result:"
+  print finalGame
+  putStrLn "Log of steps:"
+  mapM_ (putStrLn . show) logSteps
 
---runRandGame startGame
+-- runRandGame startGame
 showPossibleSteps :: Int -> [Step] -> String
 showPossibleSteps _ [] = ""
-showPossibleSteps n (x:xs) = show n ++ ". " ++ show x ++ "\n" ++ showPossibleSteps (n + 1) xs
+showPossibleSteps n (x : xs) = show n ++ ". " ++ show x ++ "\n" ++ showPossibleSteps (n + 1) xs
 
 gameWithUser :: Game -> MyMonad Game
 gameWithUser (Game sheep wolves) = do
-    let sheeps = possibleSheepSteps (Game sheep wolves)
-    case sheeps of
-        [] -> do
-            liftIO (putStrLn "No possible steps for the sheep!")
-            throwError WolfsWin  
-        _ -> do
-            liftIO (putStrLn (show (Game sheep wolves))) 
-            liftIO (putStrLn "Possible steps for the sheep:") 
-            liftIO (putStrLn (showPossibleSteps 1 sheeps))
-            temp <- liftIO getLine
-            let index = if read temp > length sheeps then 0 else read temp - 1
-            let input = sheeps !! index
-            Control.Monad.Writer.tell [input]
-            let (Step _ (Position sx sy)) = input
-            if sy == 8
-            then do
-                liftIO (putStrLn "Sheep reached the end!")
-                throwError SheepWin  
-            else do
-                let wolvess = possibleWolfsSteps (Game (Position sx sy) wolves)
-                case wolvess of
-                    [] -> do
-                        liftIO (putStrLn "No possible steps for the wolves!")
-                        throwError SheepWin  
-                    _ -> do
-                        wolfStep <- liftIO (randomElement wolvess)
-                        case wolfStep of
-                            Nothing -> do
-                                liftIO (putStrLn "No random step for the wolves!")
-                                throwError SheepWin
-                            Just (Step (Position wf wr) (Position wfn wrn)) -> do
-                                Control.Monad.Writer.tell [Step (Position wf wr) (Position wfn wrn)]
-                                        -- рекурсия потому что я устала думать и не хочу писать состояния
-                                gameWithUser (Game (Position sx sy) ((Position wfn wrn) : filter (/= (Position wf wr)) wolves))
+  let sheeps = possibleSheepSteps (Game sheep wolves)
+  case sheeps of
+    [] -> do
+      liftIO (putStrLn "No possible steps for the sheep!")
+      throwError WolfsWin
+    _ -> do
+      liftIO (putStrLn (show (Game sheep wolves)))
+      liftIO (putStrLn "Possible steps for the sheep:")
+      liftIO (putStrLn (showPossibleSteps 1 sheeps))
+      temp <- liftIO getLine
+      let index = if read temp > length sheeps then 0 else read temp - 1
+      let input = sheeps !! index
+      Control.Monad.Writer.tell [input]
+      let (Step _ (Position sx sy)) = input
+      if sy == 8
+        then do
+          liftIO (putStrLn "Sheep reached the end!")
+          throwError SheepWin
+        else do
+          let wolvess = possibleWolfsSteps (Game (Position sx sy) wolves)
+          case wolvess of
+            [] -> do
+              liftIO (putStrLn "No possible steps for the wolves!")
+              throwError SheepWin
+            _ -> do
+              wolfStep <- liftIO (randomElement wolvess)
+              case wolfStep of
+                Nothing -> do
+                  liftIO (putStrLn "No random step for the wolves!")
+                  throwError SheepWin
+                Just (Step (Position wf wr) (Position wfn wrn)) -> do
+                  Control.Monad.Writer.tell [Step (Position wf wr) (Position wfn wrn)]
+                  -- рекурсия потому что я устала думать и не хочу писать состояния
+                  gameWithUser (Game (Position sx sy) ((Position wfn wrn) : filter (/= (Position wf wr)) wolves))
 
 runGameWithUser :: Game -> IO ()
 runGameWithUser game = do
-    result <- runWriterT (runExceptT (runMyMonad (gameWithUser game)))  
-    let (finalGame, logSteps) = result  
-    putStrLn "Game result:"
-    print finalGame  
-    putStrLn "Log of steps:"
-    mapM_ (putStrLn . show) logSteps
+  result <- runWriterT (runExceptT (runMyMonad (gameWithUser game)))
+  let (finalGame, logSteps) = result
+  putStrLn "Game result:"
+  print finalGame
+  putStrLn "Log of steps:"
+  mapM_ (putStrLn . show) logSteps
 
 -- Ура, теперь можно играть! Волки не очень умные, но им и не надо, они рандомные
 -- вам приятного вечера или дня, а мне спокойной ночи :)

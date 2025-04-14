@@ -202,7 +202,7 @@ todoBot3 token = do
         [ Text.pack "Приветик! Я ящерка. Я буду приносить тебе напоминания и списки дел.",
           Text.pack "",
           Text.pack "Вот как ты можешь работать с НАПОМИНАНИЯМИ:",
-          Text.pack "1. Напиши /mkrem, чтобы поставить напоминание. Помни! Напомиинания нужно поставить в виде DD.MM HH:MM Текст.",
+          Text.pack "1. Напиши /mkrem, чтобы поставить напоминание. Помни! Напоминания нужно поставить в виде DD.MM HH:MM Текст.",
           Text.pack "Я пока умею работать только с UTC временем :)",
           Text.pack "2. Напиши /show_reminders, чтобы посмотреть на список твоих напоминаний",
           Text.pack "3. Если хочешь удалить напоминание, напиши /rmrem и номер соответствующего напоминания в списке",
@@ -232,18 +232,6 @@ todoBot3 token = do
     removeReminderByIdx :: Int -> Model -> Model
     removeReminderByIdx idx model = model {reminders = take idx (reminders model) ++ drop (idx + 1) (reminders model)}
 
-{-
-sendReminder :: Token -> Reminder -> IO ()
-sendReminder botToken reminder = do
-  let request =
-        SendMessageRequest
-          { sendMessageChatId = SomeChatId (reminderChatId reminder),
-            sendMessageText = "⏰ " <> reminderText reminder
-          }
-  env <- defaultTelegramClientEnv botToken
-  _ <- runClientM (sendMessage request) env
-  pure ()
--}
 sendReminder :: Token -> Reminder -> IO ()
 sendReminder botToken reminder = do
   let request =

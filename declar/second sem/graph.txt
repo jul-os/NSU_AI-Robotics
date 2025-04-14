@@ -1,0 +1,8 @@
+digraph graphname {
+    size=1;
+    a [label=foo];
+    b [shape=box];
+    a -> b -> c [color=blue];
+    b -> d [style=dotted];
+    a -> f -> g;
+}

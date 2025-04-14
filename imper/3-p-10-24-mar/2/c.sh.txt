@@ -1,0 +1,8 @@
+gcc -c ./zlib/minizip/ioapi.c ./zlib/minizip/unzip.c -I ./zlib/minizip  -I ./zlib -DUSE_CRYPT
+ar -cvq minizip.a *.o
+
+gcc -c ./zlib/*.c -I ./zlib
+ar -cvq zlib.a *.o
+
+gcc -c test.c -I ./zlib/minizip -I ./zlib
+gcc -o checked_solution test.o -L . -l:minizip.a -l:zlib.a

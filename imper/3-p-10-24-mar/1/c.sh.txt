@@ -1,0 +1,2 @@
+gcc -c level1.c level2.c level3.c
+ar -cvq myblas.a *.o

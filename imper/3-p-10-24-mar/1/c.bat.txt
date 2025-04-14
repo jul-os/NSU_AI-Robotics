@@ -1,0 +1,6 @@
+@echo off
+cl /c level1.c
+cl /c level2.c
+cl /c level3.c
+
+lib /OUT:myblas.lib level1.obj level2.obj level3.obj
