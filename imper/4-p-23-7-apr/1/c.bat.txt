@@ -1,0 +1,6 @@
+@echo off
+cl -c -fPIC main.c -o integerset.o
+
+cl -shared integerset.o -o integerset.so
+
+pause
