@@ -1,28 +1,16 @@
-#include "decls.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-// int strlen(char *a) {
-//     int len = 0;
-//     while (a[len] != '\0') {
-//         len++;
-//     }
-//     return len;
-// }
-
-// void strcpy(char *dest, const char *src) {
-//     int i = 0;
-//     while (src[i] != '\0') {
-//         dest[i] = src[i];
-//         i++;
-//     }
-//     dest[i] = '\0';
-// }
+typedef struct State
+{
+    char *regs[256];
+} State;
 
 void echo_0(State *state)
 {
-    printf("ECHO:\n");
+    printf("ECHO: \n");
 }
 void echo_1(State *state, char *arg0)
 {
@@ -40,7 +28,10 @@ void echo_3(State *state, char *arg0, char *arg1, char *arg2)
 void print_1(State *state, char *idx)
 {
     int idxxx = atoi(idx);
-    printf("%s\n", state->regs[idxxx]);
+    if (state->regs[idxxx] != NULL)
+    {
+        printf("%s\n", state->regs[idxxx]);
+    }
 }
 
 void printregs_0(State *state)
@@ -62,9 +53,10 @@ void store_2(State *state, char *idx, char *what)
     {
         free(state->regs[index]);
     }
-    state->regs[index] = (char *)malloc(strlen(what) + 1);
+    state->regs[index] = (char *)malloc(strlen(what) * sizeof(char) + 1);
 
     strcpy(state->regs[index], what);
+    state->regs[index][strlen(what)] = '\0';
 }
 
 void copy_2(State *state, char *dst, char *src)
@@ -79,8 +71,9 @@ void copy_2(State *state, char *dst, char *src)
     {
         free(state->regs[destination]);
     }
-    state->regs[destination] = (char *)malloc(strlen(state->regs[source]) + 1);
+    state->regs[destination] = (char *)malloc(strlen(state->regs[source]) * sizeof(char) + 1);
     strcpy(state->regs[destination], state->regs[source]);
+    state->regs[destination][strlen(state->regs[source])] = '\0';
 }
 
 void clear_1(State *state, char *idx)

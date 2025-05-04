@@ -2,8 +2,46 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "tree.h"
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
 
+#define BLOCK_SIZE 4096
+#define INITIAL_TREE_SIZE (BLOCK_SIZE * 256) // 1MB
 
+void *tree_memory = NULL;
+size_t tree_memory_size = 0;
+int tree_fd = -1;
+
+void bptree_init(int t, int data_fd, int log_fd) {
+    tree_fd = data_fd;
+    tree_memory_size = INITIAL_TREE_SIZE;
+
+    // Проверим, что файл имеет нужный размер. Если нет — увеличим.
+    struct stat st;
+    if (fstat(tree_fd, &st) == -1) {
+        perror("fstat failed");
+        return;
+    }
+    if (st.st_size < tree_memory_size) {
+        if (ftruncate(tree_fd, tree_memory_size) == -1) {
+            perror("ftruncate failed");
+            return;
+        }
+    }
+    tree_memory = mmap(NULL, tree_memory_size, PROT_READ | PROT_WRITE, MAP_SHARED, tree_fd, 0);
+    if (tree_memory == MAP_FAILED) {
+        perror("mmap failed");
+        return;
+    }
+
+    // Теперь ты можешь обращаться к tree_memory как к массиву байт
+    // Например:
+    // int* root_block = (int*)(tree_memory + 0);
+    // *root_block = 42;
+}
 
 Node * create_node(int t, bool is_leaf){
     Node * new_node = (Node*)malloc(sizeof(Node));
