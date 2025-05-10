@@ -57,6 +57,7 @@ typedef struct Node
     struct Node **children;
     int n; // Current number of keys
     bool leaf;
+    void ** data_pointers; //points to data i guess
     struct Node *prev;
     struct Node *next;
 } Node;
