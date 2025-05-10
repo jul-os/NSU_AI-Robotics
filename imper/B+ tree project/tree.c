@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include "tree.h"
 #include <sys/mman.h>
@@ -7,9 +6,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-
-#define BLOCK_SIZE 4096
-#define INITIAL_TREE_SIZE (BLOCK_SIZE * 256) // 1MB
 
 void *tree_memory = NULL;
 size_t tree_memory_size = 0;
@@ -56,7 +52,6 @@ Node * create_node(int t, bool is_leaf){
         //TODO их потом обновлять при добавлении и удалении
         new_node->prev = new_node;
         new_node->next= new_node;
-
     }
     else{
         new_node->prev = NULL;
@@ -80,8 +75,6 @@ int find_in_tree(Node* node, int key){
     if (i < node->n && key == node->keys[i]){
         return;
         //TODO значение;
-        //переходим в массив памяти по индексу key???
-        // получается так
     }
     if (node->leaf){
         printf("не найдено\n");
