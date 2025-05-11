@@ -193,14 +193,7 @@ Node *find_parent(BTree *tree, Node *child)
             current = current->children[i]; // val < C->keys[i]
         }
     }
-    if (current == child)
-    {
-        return NULL;
-    }
-    else
-    {
-        return parent;
-    }
+    return (current == child) ? parent : NULL;
 }
 
 void insert_into_leaf(Node *L, int K, void *P)
@@ -331,7 +324,8 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
 void insert(BTree *tree, int K, void *P)
 {
     // if tree is empty
-    if (tree->root == NULL || tree->root->n == 0)
+    if (tree->root == NULL || tree->root->n == 0) 
+    //task can the second thing happen?
     {
         Node *L = create_node(tree->t, true);
         // leaf L which is also the root
