@@ -187,31 +187,35 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
             insert_pos++;
         }
         insert_pos++; // inserting after N
-        //move to the right
+        // move to the right
         for (int i = parent->n; i >= insert_pos; i--)
         {
-            parent->keys[i] = parent->keys[i-1];
+            parent->keys[i] = parent->keys[i - 1];
         }
-        for (int i = parent->n + 1; i > insert_pos; i--) {
-            parent->children[i] = parent->children[i-1];
+        for (int i = parent->n + 1; i > insert_pos; i--)
+        {
+            parent->children[i] = parent->children[i - 1];
         }
-        //insert K_prime & N_prime
+        // insert K_prime & N_prime
         parent->keys[insert_pos - 1] = K_prime;
         parent->children[insert_pos] = N_prime;
-        parent-> n++;
+        parent->n++;
     }
-    //else parent doesnt have enough dpace
-    else{
-        int total_keys = P->n + 1;
-        int* temp_keys = malloc(total_keys * sizeof(int));
-        Node** temp_pointers = malloc((total_keys + 1) * sizeof(Node*));
-        
+    // else parent doesnt have enough dpace
+    else
+    {
+        int total_keys = parent->n + 1;
+        int *temp_keys = malloc(total_keys * sizeof(int));
+        Node **temp_pointers = malloc((total_keys + 1) * sizeof(Node *));
+
         // Копируем существующие данные во временный массив
         int i = 0, j = 0;
-        while (i <= P->n && P->child_pointers[i] != N) {
-            temp_pointers[j] = P->child_pointers[i];
-            if (i < P->n) {
-                temp_keys[j] = P->keys[i];
+        while (i <= parent->n && parent->children[i] != N)
+        {
+            temp_pointers[j] = parent->children[i];
+            if (i < parent->n)
+            {
+                temp_keys[j] = parent->keys[i];
             }
             i++;
             j++;
@@ -222,110 +226,133 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         j++;
         temp_pointers[j] = N_prime;
         i++;
-        
+
         // Копируем оставшиеся элементы
-        while (i <= P->n) {
-            temp_pointers[j] = P->child_pointers[i];
-            if (i < P->n) {
-                temp_keys[j] = P->keys[i];
+        while (i <= parent->n)
+        {
+            temp_pointers[j] = parent->children[i];
+            if (i < parent->n)
+            {
+                temp_keys[j] = parent->keys[i];
             }
             i++;
             j++;
         }
-        
+
         // Определяем точку разделения
         int split_pos = total_keys / 2;
         int K_double_prime = temp_keys[split_pos];
-        ///AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+        Node *P_prime = create_node(tree->t, false);
+        parent->n = 0;
+        for (i = 0; i < split_pos; i++)
+        {
+            parent->children[i] = temp_pointers[i];
+            parent->keys[i] = temp_keys[i];
+            parent->n++;
+        }
+        parent->children[i] = temp_pointers[i];
+
+        P_prime->n = 0;
+        for (i = split_pos + 1, j = 0; i < total_keys; i++, j++)
+        {
+            P_prime->children[j] = temp_pointers[i];
+            P_prime->keys[j] = temp_keys[i];
+            P_prime->n++;
+        }
+        P_prime->children[j] = temp_pointers[i];
+        free(temp_keys);
+        free(temp_pointers);
+
+        insert_into_parent(tree, parent, K_double_prime, P_prime);
     }
 }
 
-    // assignment тут короче указатель непонятно на что, когда работу с диском прибавим надо будет посмотреть что здесь должно быть
-    void insert(BTree * tree, int K, void *P)
+// assignment тут короче указатель непонятно на что, когда работу с диском прибавим надо будет посмотреть что здесь должно быть
+void insert(BTree *tree, int K, void *P)
+{
+    // if tree is empty
+    if (tree->root == NULL || tree->root->n == 0)
     {
-        // if tree is empty
-        if (tree->root == NULL || tree->root->n == 0)
-        {
-            Node *L = create_node(tree->t, true);
-            // leaf L which is also the root
-            L->keys[0] = K;
-            L->n = 1;
-            tree->root = L;
-            return;
-        }
-        // find node in which insert
-        Node *L = find_leaf(tree, K); // TODO
+        Node *L = create_node(tree->t, true);
+        // leaf L which is also the root
+        L->keys[0] = K;
+        L->n = 1;
+        tree->root = L;
+        return;
+    }
+    // find node in which insert
+    Node *L = find_leaf(tree, K); // TODO
 
-        // if node has some space
-        if (L->n < 2 * tree->t - 1)
+    // if node has some space
+    if (L->n < 2 * tree->t - 1)
+    {
+        insert_into_leaf(L, K, P);
+    }
+    else
+    {
+        // EXPLODE THE NODE
+        Node *L_prime = create_node(tree->t, true);
+        // temp malloc to store keys and pointers
+        int total_keys = L->n + 1;
+        int *temp_keys = malloc(total_keys * sizeof(int));
+        // fixme void pointers or Node pointers????
+        void **temp_pointers = malloc(total_keys * sizeof(void *));
+        // copy keys find place for new key
+        int i = 0, j = 0;
+        while (i < L->n && K > L->keys[i])
         {
-            insert_into_leaf(L, K, P);
-        }
-        else
-        {
-            // EXPLODE THE NODE
-            Node *L_prime = create_node(tree->t, true);
-            // temp malloc to store keys and pointers
-            int total_keys = L->n + 1;
-            int *temp_keys = malloc(total_keys * sizeof(int));
-            //fixme void pointers or Node pointers????
-            void **temp_pointers = malloc(total_keys * sizeof(void *));
-            // copy keys find place for new key
-            int i = 0, j = 0;
-            while (i < L->n && K > L->keys[i])
-            {
-                temp_keys[j] = L->keys[i];
-                temp_pointers[j] = L->data_pointers[i];
-                i++;
-                j++;
-            }
-            // insert new key
-            temp_keys[j] = K;
-            temp_pointers[j] = P;
+            temp_keys[j] = L->keys[i];
+            temp_pointers[j] = L->data_pointers[i];
+            i++;
             j++;
-            // copy keys that are left
-            while (i < L->n)
-            {
-                temp_keys[j] = L->keys[i];
-                temp_pointers[j] = L->data_pointers[i];
-                i++;
-                j++;
-            }
-            // find split point
-            int split_pos = total_keys / 2;
-            int K_prime = temp_keys[split_pos];
-            // TODO тут где-то запись на диск еще ))))
-            //  update L and L_prime
-            L->n = split_pos;
-            for (i = 0; i < split_pos; i++)
-            {
-                L->keys[i] = temp_keys[i];
-                L->data_pointers[i] = temp_pointers[i];
-            }
-            L_prime->n = total_keys - split_pos;
-            for (i = split_pos; i < total_keys; i++)
-            {
-                L_prime->keys[i - split_pos] = temp_keys[i];
-                L_prime->data_pointers[i - split_pos] = temp_pointers[i];
-            }
-            // update relations between leaves
-            L_prime->next = L->next;
-            if (L->next != NULL)
-            {
-                L->next->prev = L_prime;
-            }
-            L->next = L_prime;
-            L_prime->prev = L;
-            free(temp_keys);
-            free(temp_pointers);
-
-            insert_into_parent(tree, L, K_prime, L_prime);
         }
-        
-    }
+        // insert new key
+        temp_keys[j] = K;
+        temp_pointers[j] = P;
+        j++;
+        // copy keys that are left
+        while (i < L->n)
+        {
+            temp_keys[j] = L->keys[i];
+            temp_pointers[j] = L->data_pointers[i];
+            i++;
+            j++;
+        }
+        // find split point
+        int split_pos = total_keys / 2;
+        int K_prime = temp_keys[split_pos];
+        // TODO тут где-то запись на диск еще ))))
+        //  update L and L_prime
+        L->n = split_pos;
+        for (i = 0; i < split_pos; i++)
+        {
+            L->keys[i] = temp_keys[i];
+            L->data_pointers[i] = temp_pointers[i];
+        }
+        L_prime->n = total_keys - split_pos;
+        for (i = split_pos; i < total_keys; i++)
+        {
+            L_prime->keys[i - split_pos] = temp_keys[i];
+            L_prime->data_pointers[i - split_pos] = temp_pointers[i];
+        }
+        // update relations between leaves
+        L_prime->next = L->next;
+        if (L->next != NULL)
+        {
+            L->next->prev = L_prime;
+        }
+        L->next = L_prime;
+        L_prime->prev = L;
+        free(temp_keys);
+        free(temp_pointers);
 
-    int main()
-    {
-        create_tree(3);
-        return 0;
+        insert_into_parent(tree, L, K_prime, L_prime);
     }
+}
+
+int main()
+{
+    create_tree(3);
+    return 0;
+}
