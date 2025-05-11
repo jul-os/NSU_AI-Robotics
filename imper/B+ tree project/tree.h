@@ -57,7 +57,7 @@ typedef struct Node
     struct Node **children;
     int n; // Current number of keys
     bool leaf;
-    void ** data_pointers; //points to data i guess
+    void **data_pointers; // points to data i guess
     struct Node *prev;
     struct Node *next;
 } Node;
@@ -73,9 +73,8 @@ Node *create_node(int t, bool is_leaf);
 BTree *create_tree(int t);
 
 // Ключи и значения: 32-битные целые числа (int).
-int find_in_tree(Node *node, int key);
+Node *find(int val, BTree *tree);
 
 void insert(BTree *tree, int K, void *P);
-void insert_into_leaf(Node *L,int K, void * P);
-void insert_into_parent(BTree* tree, Node *N, int K_prime, Node *N_prime);
-
+void insert_into_leaf(Node *L, int K, void *P);
+void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime);

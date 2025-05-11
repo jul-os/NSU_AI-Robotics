@@ -90,27 +90,7 @@ BTree *create_tree(int t)
     return tree;
 }
 
-int find_in_tree(Node *node, int key)
-{
-    int i = 0;
-    while (i < node->n && key > node->keys[i])
-    {
-        i++;
-    }
-    if (i < node->n && key == node->keys[i])
-    {
-        return;
-        // TODO значение;
-    }
-    if (node->leaf)
-    {
-        printf("не найдено\n");
-        return 0;
-    }
-    return find_in_tree(node->children[i], key);
-}
-
-void find(int val, BTree *tree)
+Node * find(int val, BTree *tree)
 {
     // start with head node
     Node *C = tree->root;
@@ -139,6 +119,7 @@ void find(int val, BTree *tree)
         if (C->keys[i] == val)
         {
             // TODO функция которая достает с диска
+            return C;
         }
         // else null
     }
