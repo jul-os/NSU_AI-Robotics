@@ -76,5 +76,6 @@ BTree *create_tree(int t);
 int find_in_tree(Node *node, int key);
 
 void insert(BTree *tree, int K, void *P);
+void insert_into_leaf(Node *L,int K, void * P);
+void insert_into_parent(BTree* tree, Node *N, int K_prime, Node *N_prime);
 
-void no_split_insert(Node *node, int key);
