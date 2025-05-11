@@ -75,6 +75,6 @@ BTree *create_tree(int t);
 // Ключи и значения: 32-битные целые числа (int).
 int find_in_tree(Node *node, int key);
 
-void insert(BTree *tree, int key, int val);
+void insert(BTree *tree, int K, void *P);
 
 void no_split_insert(Node *node, int key);

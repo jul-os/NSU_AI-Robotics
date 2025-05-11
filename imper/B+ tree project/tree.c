@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 void *tree_memory = NULL;
 size_t tree_memory_size = 0;
@@ -143,6 +144,27 @@ void find(int val, BTree *tree)
     }
 }
 
+void insert_into_leaf(Node *L, int K, void *P)
+{
+    //find where to insert
+    int insert_pos = 0;
+    while (insert_pos < L->n && K > L->keys[insert_pos]){
+        insert_pos++;
+    }
+    //move other elements to the right
+    //пояснение: мы в insert уже проверили что лист не будет переполнен
+    for (int i = L->n; i>insert_pos; i--){
+        L->keys[i] = L->keys[i-1];
+        L->data_pointers[i] = L->data_pointers[i-1];
+    }
+    //insert the new key and pointer
+    L->keys[insert_pos] = K;
+    L->data_pointers[insert_pos] = P;
+    L->n++;
+    //оказалось что вообще-то указатель из родителя в лист не обязан указывать на первый элемент листа поэтому типа все в этой функции
+    
+}
+
 // assignment тут короче указатель непонятно на что, когда работу с диском прибавим надо будет посмотреть что здесь должно быть
 void insert(BTree *tree, int K, void *P)
 {
@@ -157,7 +179,7 @@ void insert(BTree *tree, int K, void *P)
         return;
     }
     // find node in which insert
-    Node *L = find_leaf(tree, K);
+    Node *L = find_leaf(tree, K); //TODO
 
     // if node has some space
     if (L->n < 2 * tree->t - 1)
@@ -181,35 +203,39 @@ void insert(BTree *tree, int K, void *P)
             i++;
             j++;
         }
-        //insert new key
+        // insert new key
         temp_keys[j] = K;
         temp_pointers[j] = P;
         j++;
-        //copy keys that are left
-        while(i< L->n){
+        // copy keys that are left
+        while (i < L->n)
+        {
             temp_keys[j] = L->keys[i];
             temp_pointers[j] = L->data_pointers[i];
             i++;
             j++;
         }
-        //find split point
-        int split_pos = total_keys/2;
+        // find split point
+        int split_pos = total_keys / 2;
         int K_prime = temp_keys[split_pos];
-        //TODO тут где-то запись на диск еще ))))
-        // update L and L_prime
+        // TODO тут где-то запись на диск еще ))))
+        //  update L and L_prime
         L->n = split_pos;
-        for (i = 0; i < split_pos; i++){
+        for (i = 0; i < split_pos; i++)
+        {
             L->keys[i] = temp_keys[i];
             L->data_pointers[i] = temp_pointers[i];
         }
         L_prime->n = total_keys - split_pos;
-        for (i = split_pos; i<total_keys; i++){
+        for (i = split_pos; i < total_keys; i++)
+        {
             L_prime->keys[i - split_pos] = temp_keys[i];
             L_prime->data_pointers[i - split_pos] = temp_pointers[i];
         }
-        //update relations between leaves
+        // update relations between leaves
         L_prime->next = L->next;
-        if (L->next != NULL){
+        if (L->next != NULL)
+        {
             L->next->prev = L_prime;
         }
         L->next = L_prime;
