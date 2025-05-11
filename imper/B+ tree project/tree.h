@@ -73,7 +73,9 @@ Node *create_node(int t, bool is_leaf);
 BTree *create_tree(int t);
 
 // Ключи и значения: 32-битные целые числа (int).
-Node *find(int val, BTree *tree);
+void find(int val, BTree *tree);
+Node* find_leaf(int val, BTree *tree);
+Node *find_parent(BTree *tree, Node *child);
 
 void insert(BTree *tree, int K, void *P);
 void insert_into_leaf(Node *L, int K, void *P);

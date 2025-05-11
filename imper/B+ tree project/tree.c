@@ -73,6 +73,7 @@ Node *create_node(int t, bool is_leaf)
         // TODO points to some data
         new_node->prev = new_node;
         new_node->next = new_node;
+        // fixme хотя на самом деле я хз на что оно должно указывать
     }
     else
     {
@@ -90,14 +91,14 @@ BTree *create_tree(int t)
     return tree;
 }
 
-Node * find(int val, BTree *tree)
+void find(int val, BTree *tree)
 {
     // start with head node
     Node *C = tree->root;
     while (!C->leaf)
     {
         int i = 0;
-        while (i < C->n && val > C->keys[i])
+        while (i < C->n && val <= C->keys[i])
         {
             i++;
         }
@@ -111,17 +112,94 @@ Node * find(int val, BTree *tree)
         }
         else
         {
-            C = C->children[i];
+            C = C->children[i]; // val < C->keys[i]
         }
     }
+    // now C is a leaf
     for (int i = 0; i < C->n; i++)
     {
         if (C->keys[i] == val)
         {
             // TODO функция которая достает с диска
+            return C->data_pointers[i]; // fixme тип функции другой скорее всего
+        }
+    }
+    return NULL;
+}
+
+// то же самое что обычный find но возвращает лист С а не инфу
+Node *find_leaf(int val, BTree *tree)
+{
+    // start with head node
+    Node *C = tree->root;
+    while (!C->leaf)
+    {
+        int i = 0;
+        while (i < C->n && val <= C->keys[i])
+        {
+            i++;
+        }
+        if (i == C->n)
+        {
+            C = C->children[C->n];
+        }
+        else if (val == C->keys[i])
+        {
+            C = C->children[i + 1];
+        }
+        else
+        {
+            C = C->children[i]; // val < C->keys[i]
+        }
+    }
+    // now C is a leaf
+    for (int i = 0; i < C->n; i++)
+    {
+        if (C->keys[i] == val)
+        {
             return C;
         }
-        // else null
+    }
+    return NULL;
+}
+
+Node *find_parent(BTree *tree, Node *child)
+{
+    if (tree->root == child)
+    {
+        return NULL;
+    }
+
+    Node *current = tree->root;
+    Node *parent = NULL;
+    while (!current->leaf && current != child)
+    {
+        parent = current;
+        int i = 0;
+        while (i < current->n && current->keys[0] <= current->keys[i])
+        {
+            i++;
+        }
+        if (i == current->n)
+        {
+            current = current->children[current->n];
+        }
+        else if (current->keys[0] == current->keys[i])
+        {
+            current = current->children[i + 1];
+        }
+        else
+        {
+            current = current->children[i]; // val < C->keys[i]
+        }
+    }
+    if (current == child)
+    {
+        return NULL;
+    }
+    else
+    {
+        return parent;
     }
 }
 
@@ -159,7 +237,7 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         tree->root = new_root;
         return;
     }
-    Node *parent = find_parent(N); // TODO
+    Node *parent = find_parent(tree, N);
     if (parent->n < 2 * tree->t - 1)
     {
         int insert_pos = 0;
@@ -263,7 +341,7 @@ void insert(BTree *tree, int K, void *P)
         return;
     }
     // find node in which insert
-    Node *L = find_leaf(tree, K); // TODO
+    Node *L = find_leaf(K, tree);
 
     // if node has some space
     if (L->n < 2 * tree->t - 1)
