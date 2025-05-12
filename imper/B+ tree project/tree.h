@@ -80,3 +80,6 @@ Node *find_parent(BTree *tree, Node *child);
 void insert(BTree *tree, int K, void *P);
 void insert_into_leaf(Node *L, int K, void *P);
 void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime);
+
+void delete(int key, void * point, BTree* tree);
+

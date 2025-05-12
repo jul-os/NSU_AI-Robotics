@@ -404,6 +404,11 @@ void insert(BTree *tree, int K, void *P)
     }
 }
 
+void delete(int key, void * point, BTree* tree){
+    Node * leaf = find_leaf(key, tree);
+    delete_entry(leaf, key, point, tree);
+}
+
 int main()
 {
     create_tree(3);
