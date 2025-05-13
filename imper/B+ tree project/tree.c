@@ -91,7 +91,7 @@ BTree *create_tree(int t)
     return tree;
 }
 
-void find(int val, BTree *tree)
+void *find(int val, BTree *tree)
 {
     // start with head node
     Node *C = tree->root;
@@ -324,8 +324,8 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
 void insert(BTree *tree, int K, void *P)
 {
     // if tree is empty
-    if (tree->root == NULL || tree->root->n == 0) 
-    //task can the second thing happen?
+    if (tree->root == NULL || tree->root->n == 0)
+    // task can the second thing happen?
     {
         Node *L = create_node(tree->t, true);
         // leaf L which is also the root
@@ -404,13 +404,145 @@ void insert(BTree *tree, int K, void *P)
     }
 }
 
-void delete(int key, void * point, BTree* tree){
-    Node * leaf = find_leaf(key, tree);
+// находит индекс (позицию) узла child среди дочерних узлов его родителя parent
+int find_child_index(Node *parent, Node *child)
+{
+    int index = 0;
+    while (index <= parent->n && parent->children[index != child])
+    {
+        index++;
+    }
+    return index;
+}
+
+void remove_key_and_pointer(Node *N, int K)
+{
+    // task а оно может вообще быть не листом?
+    int i = 0;
+    while (i < N->n && N->keys[i] != K)
+    {
+        i++;
+    }
+
+    // if leaf, shilf keys and data pointers
+    if (N->leaf)
+    {
+        for (; i < N->n - 1; i++)
+        {
+            N->keys[i] = N->keys[i + 1];
+            N->data_pointers[i] = N->data_pointers[i + 1];
+        }
+    }
+    // if interanal node, shift keys and children pointers
+    else
+    {
+        for (; i < N->n - 1; i++)
+        {
+            N->keys[i] = N->keys[i + 1];
+            N->children[i] = N->children[i + 1];
+        }
+    }
+    N->n--;
+}
+
+void delete_entry(Node *N, int K, void *P, BTree *tree)
+{
+    // remove key and pointers from the node
+    remove_key_and_pointer(N, K);
+
+    // if (N is the root and N has only one remaining child)
+    // then make the child of N the new root of the tree and delete N
+    if (N == tree->root && N->n == 0 && !N->leaf)
+    {
+        // в общем n = 0 и 1 ребенок это норм потому что кол-во детей = n + 1
+        // но 1 ребенок может бть только у корня если что
+        Node *new_root = N->children[0];
+        free(N->keys);
+        free(N->children);
+        free(N);
+        tree->root = new_root;
+        return;
+    }
+
+    // if after deletion node has too few keys/pointers
+    if (!N->leaf && N->n < tree->t - 1)
+    {
+        Node *parent = find_parent(tree, N);
+        int N_index = find_child_index(parent, N);
+
+        Node *left_sibling = (N_index > 0) ? parent->children[N_index - 1] : NULL;
+        Node *right_sibling = (N_index < parent->n) ? parent->children[N_index + 1] : NULL;
+
+        // try borrowing from the left sibling
+        if (left_sibling && left_sibling->n > tree->t - 1)
+        {
+            redistribute_nodes(N, left_sibling, parent, parent->keys[N_index - 1], N_index);
+        }
+        // try borrowing from the right sibling
+        else if (right_sibling && right_sibling->n > tree->t - 1)
+        {
+            redistribute_nodes(N, right_sibling, parent, parent->keys[N_index], N_index);
+        }
+        // if cant borrow merge
+        else
+        {
+            if (left_sibling)
+            {
+                coalesce_nodes(N, left_sibling, parent, parent->keys[N_index - 1], tree);
+            }
+            else if (right_sibling)
+            {
+                coalesce_nodes(right_sibling, N, parent, parent->keys[N_index], tree);
+            }
+        }
+    }
+    // now if N doesnt have too few keys/pointers
+    else if (N->leaf && N->n < tree->t - 1)
+    {
+        Node *parent = find_parent(tree, N);
+        if (parent)
+        {
+            int N_index = find_child_index(parent, N);
+
+            // Find left and right siblings
+            Node *left_sibling = (N_index > 0) ? parent->children[N_index - 1] : NULL;
+            Node *right_sibling = (N_index < parent->n) ? parent->children[N_index + 1] : NULL;
+
+            // Try to borrow from left sibling
+            if (left_sibling && left_sibling->n > tree->t - 1)
+            {
+                redistribute_nodes(N, left_sibling, parent, parent->keys[N_index - 1], N_index);
+            }
+            // Try to borrow from right sibling
+            else if (right_sibling && right_sibling->n > tree->t - 1)
+            {
+                redistribute_nodes(N, right_sibling, parent, parent->keys[N_index], N_index);
+            }
+            // If can't borrow, merge with a sibling
+            else
+            {
+                if (left_sibling)
+                {
+                    coalesce_nodes(N, left_sibling, parent, parent->keys[N_index - 1], tree);
+                }
+                else if (right_sibling)
+                {
+                    coalesce_nodes(right_sibling, N, parent, parent->keys[N_index], tree);
+                }
+            }
+        }
+    }
+}
+
+void delete(int key, void *point, BTree *tree)
+{
+    Node *leaf = find_leaf(key, tree);
     delete_entry(leaf, key, point, tree);
 }
 
 int main()
 {
-    create_tree(3);
+    BTree *tre = create_tree(3);
+    insert(tre, 10, 20);
     return 0;
 }
