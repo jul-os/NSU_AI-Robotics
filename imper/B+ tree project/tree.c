@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "tree.h"
+#include "disk.h"
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -12,6 +13,8 @@ void *tree_memory = NULL;
 size_t tree_memory_size = 0;
 int tree_fd = -1;
 
+
+//fixme возможно не понадобиться после дописания disk.h
 void bptree_init(int t, int data_fd, int log_fd)
 {
     tree_fd = data_fd;
@@ -39,7 +42,7 @@ void bptree_init(int t, int data_fd, int log_fd)
         return;
     }
 
-    // Теперь ты можешь обращаться к tree_memory как к массиву байт
+    // Теперь можно обращаться к tree_memory как к массиву байт
     // Например:
     // int* root_block = (int*)(tree_memory + 0);
     // *root_block = 42;
@@ -194,6 +197,41 @@ Node *find_parent(BTree *tree, Node *child)
         }
     }
     return (current == child) ? parent : NULL;
+}
+
+// TODO check
+void range_query(BTree *tree, int min_k, int max_k)
+{
+    if (!tree || !tree->root)
+    {
+        return;
+    }
+    Node *start_node = find_leaf(min_k, tree);
+    if (!start_node)
+    {
+        return;
+    }
+    int i = 0;
+    // пропускаем ключи коорые меньше min_k
+    while (i < start_node->n && start_node->keys[i] < min_k)
+    {
+        i++;
+    }
+    while (start_node != NULL)
+    {
+        for (; i < start_node->n; i++)
+        {
+            if (start_node->keys[i] > max_k)
+            {
+                return;
+            }
+            // else were still in the right diaposon
+            // TODO take from mem
+        }
+
+        start_node = start_node->next;
+        i = 0;
+    }
 }
 
 void insert_into_leaf(Node *L, int K, void *P)
@@ -443,6 +481,148 @@ void remove_key_and_pointer(Node *N, int K)
         }
     }
     N->n--;
+}
+
+// merge two nodes together
+void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tree)
+{
+    if (!N->leaf)
+    {
+        // последний ключ левого узла теперь ключ который разделял левый и правый ключи в родительском узле
+        N_prime->keys[N_prime->n] = K_prime;
+        N_prime->n++;
+
+        // copy from N to N_prime
+        for (int i = 0; i < N->n; i++)
+        {
+            N_prime->keys[N_prime->n + i] = N->keys[i];
+            N_prime->children[N_prime->n + i] = N->children[i];
+        }
+        N_prime->children[N_prime->n + N->n] = N->children[N->n];
+        N_prime->n += N->n;
+    }
+    else
+    {
+        for (int i = 0; i < N->n; i++)
+        {
+            N_prime->keys[N_prime->n + i] = N->keys[i];
+            N_prime->data_pointers[N_prime->n + i] = N->data_pointers[i];
+        }
+        N_prime->n += N->n;
+
+        // Update leaf linked list
+        N_prime->next = N->next;
+        if (N->next != NULL)
+        {
+            N->next->prev = N_prime;
+        }
+        // N_prime-> prev и N_prime->prev->next обновлять не нужно
+        // N_prime-> next = N->next
+        // N->next->prev = N_prime
+        // N->prev удалится при удалении узла ниже
+    }
+    delete_entry(parent, K_prime, N, tree);
+    free(N->keys);
+    if (N->leaf)
+    {
+        free(N->data_pointers);
+    }
+    else
+    {
+        free(N->children);
+    }
+    free(N);
+}
+
+void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index)
+{
+    // if N_prime is left to N
+    if (N_index > 0 && parent->children[N_index - 1] == N_prime)
+    {
+        if (!N->leaf)
+        {
+            // Move the last child of N_prime to be the first child of N
+            for (int i = N->n; i > 0; i--)
+            {
+                N->keys[i] = N->keys[i - 1];
+                N->children[i + 1] = N->children[i];
+            }
+            N->children[1] = N->children[0];
+            /*тут логика такая
+            K_prime это ключ который стоит между узлами N_prime и N в родительском узле
+            и мы хотим чтобы на место этого ключа в родительском узле встал нужный нам ключ из N_prime
+            а K_prime из ролителя спускаем в N
+            из N_prime при этом он как бы уходит
+            */
+            N->children[0] = N_prime->children[N_prime->n];
+            N->keys[0] = K_prime;
+            N->n++;
+
+            // update key in parent
+            parent->keys[N_index - 1] = N_prime->keys[N_prime->n - 1];
+            N_prime->n--;
+        }
+        // else its a leaf
+        else
+        {
+            // same but for keys
+            for (int i = N->n; i > 0; i--)
+            {
+                N->keys[i] = N->keys[i - 1];
+                N->data_pointers[i] = N->data_pointers[i - 1];
+            }
+
+            N->keys[0] = N_prime->keys[N_prime->n - 1];
+            N->data_pointers[0] = N_prime->data_pointers[N_prime->n - 1];
+            N->n++;
+
+            // update key in parent
+            parent->keys[N_index - 1] = N->keys[0];
+            N_prime->n--;
+        }
+    }
+    // else N_prime is right to N
+    else
+    {
+        if (!N->leaf)
+        {
+            // move first child of N_prime to be last in N
+            N->keys[N->n] = K_prime;
+            N->children[N->n + 1] = N_prime->children[0];
+            N->n++;
+
+            // update key in parent
+            parent->keys[N_index] = N_prime->keys[0];
+
+            // Shift keys and children in N_prime
+            for (int i = 0; i < N_prime->n - 1; i++)
+            {
+                N_prime->keys[i] = N_prime->keys[i + 1];
+                N_prime->children[i] = N_prime->children[i + 1];
+            }
+            N_prime->children[N_prime->n - 1] = N_prime->children[N_prime->n];
+            N_prime->n--;
+        }
+        else
+        {
+            // For leaf nodes
+            // Move the first key of N_prime to be the last key of N
+            N->keys[N->n] = N_prime->keys[0];
+            N->data_pointers[N->n] = N_prime->data_pointers[0];
+            N->n++;
+
+            // Update parent's key
+            parent->keys[N_index] = N_prime->keys[1];
+
+            // Shift keys and data pointers in N_prime
+            for (int i = 0; i < N_prime->n - 1; i++)
+            {
+                N_prime->keys[i] = N_prime->keys[i + 1];
+                N_prime->data_pointers[i] = N_prime->data_pointers[i + 1];
+            }
+            N_prime->n--;
+        }
+    }
 }
 
 void delete_entry(Node *N, int K, void *P, BTree *tree)

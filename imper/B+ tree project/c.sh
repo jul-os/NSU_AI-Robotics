@@ -1,0 +1,1 @@
+gcc main.c tree.c disk.c -o BTREE
