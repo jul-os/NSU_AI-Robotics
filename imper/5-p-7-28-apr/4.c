@@ -30,7 +30,7 @@ void append(Node **listVertices, int vertex) { // заполнение спис�
     *listVertices = buffer;
 }
 
-int BFS(Vertex *variable) { // поиск в ширину
+int DFS(Vertex *variable) { 
     variable->color = GRAY;
 
     Node *buffer = variable->incidentVertices;
@@ -41,7 +41,7 @@ int BFS(Vertex *variable) { // поиск в ширину
         }
 
         if ((vertices[buffer->vertex].color == WHITE) &&
-            (BFS(vertices + buffer->vertex) == 0)) {
+            (DFS(vertices + buffer->vertex) == 0)) {
             return 0;
         }
 
@@ -68,8 +68,7 @@ void prepare() { // подготовка
 
 void freeUp() {
     for (int i = 0; i < quantityVariables; i++) {
-        Node *next, *buffer = vertices[i].incidentVertices; //смешно но с i+1 тоже проходит бот
-        //но вроде бы такк правильнее
+        Node *next, *buffer = vertices[i].incidentVertices;
         while (buffer != NULL) {
             next = buffer->next;
             free(buffer);
@@ -90,7 +89,7 @@ int main() {
     // поиск в ширину
     for (int i = 1; i <= quantityVariables; i++) {
         if (vertices[i].color == WHITE) {
-            if (BFS(&vertices[i]) == 0) {
+            if (DFS(&vertices[i]) == 0) {
                 flag = 0;
                 break;
             }

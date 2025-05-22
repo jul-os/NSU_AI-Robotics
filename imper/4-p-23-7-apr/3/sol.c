@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define MAX_VERTICES 300000
-#define MAX_EDGES 300000  // Максимальное количество рёбер во входных данных
+#define MAX_EDGES 300000  
 
 static Edge edge_buffer[MAX_EDGES];  // Временный буфер для всех рёбер
 static Edge edges[MAX_EDGES * 2];    // Основной массив рёбер (каждое ребро учитывается дважды)
@@ -13,27 +13,22 @@ static int total_edges = 0;          // Общее количество запи
 void init() {
     int N = getVerticesCount();
     if (N > MAX_VERTICES) exit(1);
-
-    // 1. Читаем все рёбра в буфер и считаем, сколько рёбер у каждой вершины
     int M = 0;
     Edge edge;
     while (readEdge(&edge)) {
         if (M >= MAX_EDGES) exit(1);
         edge_buffer[M++] = edge;
         
-        // Увеличиваем счётчик рёбер для вершины edge.from
         vertex_edge_count[edge.from]++;
-        
-        // Если ребро не петля, увеличиваем счётчик для вершины edge.to
         if (edge.from != edge.to) {
             vertex_edge_count[edge.to]++;
         } else {
-            // Если это петля, учитываем её дважды
+            // Если это петля, учитываем дважды
             vertex_edge_count[edge.from]++;
         }
     }
 
-    // 2. Вычисляем начальные индексы (префиксные суммы)
+    // Вычисляем начальные индексы (префиксные суммы)
     vertex_edge_start[0] = 0;
     for (int i = 1; i < N; i++) {
         vertex_edge_start[i] = vertex_edge_start[i - 1] + vertex_edge_count[i - 1];
@@ -41,7 +36,7 @@ void init() {
     }
     vertex_edge_count[N - 1] = 0;
 
-    // 3. Заполняем рёбра в основной массив
+    // Заполняем рёбра в основной массив
     for (int i = 0; i < M; i++) {
         Edge e = edge_buffer[i];
 
