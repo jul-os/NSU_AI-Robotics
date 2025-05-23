@@ -92,3 +92,10 @@ int32_t allocate_block(DiskBTree *dbt)
     }
     return new_block;
 }
+
+void free_block(DiskBTree* dbt, int32_t block_num){
+    //получаем указатель на начало блока
+    int32_t* block_ptr = (int32_t*)((char*)dbt->mmap_ptr + block_num*BLOCK_SIZE);
+
+    //
+}
