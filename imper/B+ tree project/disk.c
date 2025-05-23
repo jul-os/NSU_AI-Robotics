@@ -1,9 +1,12 @@
+#define _GNU_SOURCE  // Для mremap() с MREMAP_MAYMOVE
 #include <stdio.h>
 #include <stdlib.h>
 #include "tree.h"
 #include "disk.h"
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <bits/mman-shared.h>
 
 DiskBTree *init_disk(int fd, int t)
 {
@@ -20,7 +23,7 @@ DiskBTree *init_disk(int fd, int t)
     if (mmap_ptr == MAP_FAILED)
     {
         perror("mmap failed");
-                close(fd);
+        close(fd);
         return NULL;
     }
 
@@ -52,4 +55,40 @@ DiskBTree *init_disk(int fd, int t)
     }
 
     return dbt;
+}
+
+int32_t allocate_block(DiskBTree *dbt)
+{
+    // Проверить наличие свободных блоков
+    if (dbt->header->list_of_free_blocks != -1)
+    {   
+        //Берем номер первого свободного блока
+        int32_t free_block = dbt->header->list_of_free_blocks;
+        //Получаем указатель на этот блок в mmap области
+        int32_t *block_ptr = (int32_t *)((char *)dbt->mmap_ptr + free_block + BLOCK_SIZE);
+        //тк в свободных блоках первые 4 байта указывают на следующий свободный блок то вот этим мы усстанвливаем начало списка на следующий
+        dbt->header->list_of_free_blocks = *block_ptr;
+        msync(dbt->header, BLOCK_SIZE, MS_SYNC);
+        return free_block;
+    }
+    
+    //Если свободных блоков нет расширяем файл
+
+    int32_t new_block = dbt->header->num_blocks++;
+    size_t required_size = (new_block + 1) * BLOCK_SIZE;
+    //при необходимости расширяем mmap
+    if (required_size > dbt->mmap_size){
+        size_t new_size = dbt->mmap_size *2;
+        //физическое расширение файла
+        ftruncate(dbt->fd, new_size);
+        void* new_ptr = mremap(dbt->mmap_ptr, dbt->mmap_size, new_size, new_size, MREMAP_MAYMOVE);
+        if (new_ptr == MAP_FAILED){
+            perror("Failed to expand file");
+            return -1;
+        }
+        dbt->mmap_ptr = new_ptr;
+        dbt->mmap_size = new_size;
+        dbt->header = (DiskBTreeHeader*)dbt->mmap_ptr;
+    }
+    return new_block;
 }

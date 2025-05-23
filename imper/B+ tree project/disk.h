@@ -16,15 +16,6 @@
 - reserved:     4096 - (1+4+252+256) = 3583 байта
 */
 
-// Структура дерева на диске. Контроллирует диск
-typedef struct
-{
-    int fd;                  // Файловый дескриптор
-    void *mmap_ptr;          // Указатель на mmap-область
-    size_t mmap_size;        // Текущий размер отображения
-    DiskBTreeHeader *header; // Указатель на заголовок
-} DiskBTree;
-
 #pragma pack(push, 1)
 // Структура описания заголовка файла дерева
 typedef struct DiskBTreeHeader
@@ -36,6 +27,15 @@ typedef struct DiskBTreeHeader
     uint8_t reserved[4076];      // Резерв (выравнивание до 4096 байт)
 } DiskBTreeHeader;
 #pragma pack(pop)
+
+// Структура дерева на диске. Контроллирует диск
+typedef struct DiskBTree
+{
+    int fd;                  // Файловый дескриптор
+    void *mmap_ptr;          // Указатель на mmap-область
+    size_t mmap_size;        // Текущий размер отображения
+    DiskBTreeHeader *header; // Указатель на заголовок
+} DiskBTree;
 
 // Структура узла на диске
 #pragma pack(push, 1)
@@ -60,4 +60,14 @@ typedef struct
 } DiskNode;
 #pragma pack(pop)
 
+//инициализирует структуры для начала работы с диском 
 DiskBTree *init_disk(int fd, int t);
+
+// Выделяет новый блок (либо из свободных, либо расширяет файл)
+int32_t allocate_block(DiskBTree* dbt);
+
+// Возвращает блок в список свободных
+void free_block(DiskBTree* dbt, int32_t block_num);
+
+// Инициализирует список свободных блоков при создании файла
+void init_free_blocks(DiskBTree* dbt, int32_t start_block, int32_t count);

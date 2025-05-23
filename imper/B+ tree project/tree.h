@@ -7,7 +7,6 @@ typedef struct DiskBTree DiskBTree;
 typedef struct Node
 {
     int * keys;
-    int t; // Minimum degree (defines the range for number of keys)
     struct Node **children;
     int n; // Current number of keys
     bool leaf;

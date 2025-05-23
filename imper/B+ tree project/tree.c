@@ -14,75 +14,60 @@ size_t tree_memory_size = 0;
 int tree_fd = -1;
 
 
-//fixme возможно не понадобиться после дописания disk.h
-void bptree_init(int t, int data_fd, int log_fd)
-{
-    tree_fd = data_fd;
-    tree_memory_size = INITIAL_TREE_SIZE;
-
-    // Проверим, что файл имеет нужный размер. Если нет — увеличим.
-    struct stat st;
-    if (fstat(tree_fd, &st) == -1)
-    {
-        perror("fstat failed");
-        return;
-    }
-    if (st.st_size < tree_memory_size)
-    {
-        if (ftruncate(tree_fd, tree_memory_size) == -1)
-        {
-            perror("ftruncate failed");
-            return;
-        }
-    }
-    tree_memory = mmap(NULL, tree_memory_size, PROT_READ | PROT_WRITE, MAP_SHARED, tree_fd, 0);
-    if (tree_memory == MAP_FAILED)
-    {
-        perror("mmap failed");
-        return;
-    }
-
-    // Теперь можно обращаться к tree_memory как к массиву байт
-    // Например:
-    // int* root_block = (int*)(tree_memory + 0);
-    // *root_block = 42;
-}
-
 Node *create_node(int t, bool is_leaf)
 {
     Node *new_node = (Node *)malloc(sizeof(Node));
+    if (!new_node)
+    {
+        perror("malloc failed on node");;
+        return NULL;
+    }
     new_node->keys = (int *)malloc((2 * t - 1) * sizeof(int));
+    if (!new_node->keys)
+    {
+        perror("malloc failed on node keys");
+        free(new_node);
+        return NULL;
+    }
+
+    new_node->n = 0;
+    new_node->leaf = is_leaf;
+    new_node->disk_block = -1;
+
     // Выделяем память для pointers
     if (is_leaf)
     {
         // Для листа - указатели на данные (records)
         new_node->data_pointers = (void **)malloc((2 * t - 1) * sizeof(void *));
+        if (!new_node->data_pointers)
+        {
+            perror("malloc failed on node data pointers");
+            free(new_node->keys);
+            free(new_node);
+            return NULL;
+        }
         new_node->children = NULL; // Листья не имеют дочерних узлов
+        new_node->prev = NULL;
+        new_node->next = NULL;
     }
     else
     {
         // Для внутреннего узла - указатели на дочерние узлы
-        new_node->data_pointers = NULL; // Не используем для данных
         // каждый узел содержит не более 2t-1 ключей
         // внутренний узел содержит не более 2t дочерних узлов
         new_node->children = (Node **)malloc(2 * t * sizeof(Node *));
-    }
-    new_node->t = t;
-    new_node->n = 0;
-    new_node->leaf = is_leaf;
-    if (new_node->leaf)
-    {
-        // TODO их потом обновлять при добавлении и удалении
-        // TODO points to some data
-        new_node->prev = new_node;
-        new_node->next = new_node;
-        // fixme хотя на самом деле я хз на что оно должно указывать
-    }
-    else
-    {
+        if (!new_node->children)
+        {
+            perror("malloc failed on node children pointers");
+            free(new_node->keys);
+            free(new_node);
+            return NULL;
+        }
+        new_node->data_pointers = NULL; // Не используем для данных
         new_node->prev = NULL;
         new_node->next = NULL;
     }
+
     return new_node;
 }
 
@@ -453,7 +438,7 @@ void insert(BTree *tree, int K, void *P)
 int find_child_index(Node *parent, Node *child)
 {
     int index = 0;
-    while (index <= parent->n && parent->children[index != child])
+    while (index <= parent->n && parent->children[index != child]) //fixme comparison between pointer and integer
     {
         index++;
     }
