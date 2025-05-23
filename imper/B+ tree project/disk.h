@@ -3,14 +3,61 @@
 #include <stdint.h>
 
 #define BLOCK_SIZE 4096
-#define INITIAL_TREE_SIZE (BLOCK_SIZE * 256) // 1MB
+#define INITIAL_TREE_SIZE (BLOCK_SIZE * 256)                             // 1MB
+#define T_MAX 32                                                         // Максимальный порядок дерева
+#define X (BLOCK_SIZE - (1 + 4 + (2 * T_MAX - 1) * 4 + (2 * T_MAX) * 4)) // Расчет выравнивания
 
-#pragma pack(push, 1) 
-typedef struct DiskBTreeHeader {
-    int32_t t;            // Порядок дерева (min degree)
-    int32_t root_block;   // Смещение корня (в блоках, не в байтах!)
-    int32_t list_of_free_blocks;    // Голова списка свободных блоков (-1 если нет)
-    int32_t num_blocks;   // Общее количество блоков в файле
-    uint8_t reserved[4076]; // Резерв (выравнивание до 4096 байт)
+/*
+Общий размер DiskNode:
+- is_leaf:       1 байт
+- num_keys:      4 байта
+- keys:         (2*32-1)*4 = 252 байта
+- children:     (2*32)*4 = 256 байт (худший случай)
+- reserved:     4096 - (1+4+252+256) = 3583 байта
+*/
+
+// Структура дерева на диске. Контроллирует диск
+typedef struct
+{
+    int fd;                  // Файловый дескриптор
+    void *mmap_ptr;          // Указатель на mmap-область
+    size_t mmap_size;        // Текущий размер отображения
+    DiskBTreeHeader *header; // Указатель на заголовок
+} DiskBTree;
+
+#pragma pack(push, 1)
+// Структура описания заголовка файла дерева
+typedef struct DiskBTreeHeader
+{
+    int32_t t;                   // Порядок дерева (min degree)
+    int32_t root_block;          // Смещение корня (в блоках, не в байтах!)
+    int32_t list_of_free_blocks; // Голова списка свободных блоков (-1 если нет)
+    int32_t num_blocks;          // Общее количество блоков в файле
+    uint8_t reserved[4076];      // Резерв (выравнивание до 4096 байт)
 } DiskBTreeHeader;
 #pragma pack(pop)
+
+// Структура узла на диске
+#pragma pack(push, 1)
+typedef struct
+{
+    uint8_t is_leaf;             // Флаг листа
+    int32_t num_keys;            // Количество ключей
+    int32_t keys[2 * T_MAX - 1]; // Ключи
+
+    union
+    {
+        int32_t children[2 * T_MAX]; // Для внутренних узлов: указатели на блоки
+        struct
+        {
+            int32_t values[2 * T_MAX - 1]; // Для листьев: значения
+            int32_t next_leaf;             // Связь с соседним листом
+            int32_t prev_leaf;
+        };
+    };
+
+    uint8_t reserved[X]; // Выравнивание до BLOCK_SIZE
+} DiskNode;
+#pragma pack(pop)
+
+DiskBTree *init_disk(int fd, int t);

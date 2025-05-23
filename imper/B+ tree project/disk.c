@@ -5,30 +5,51 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-//task спросить какой вариант памяти лучше выбрать
-
-
-void init_empty_tree(int fd, int t) {
-    // 1. Установить размер файла
-    ftruncate(fd, BLOCK_SIZE);
-    
-    // 2. Отобразить файл в память
-    void* ptr = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED) {
-        perror("mmap failed");
-        exit(EXIT_FAILURE);
+DiskBTree *init_disk(int fd, int t)
+{
+    // Установить размер файла
+    if (ftruncate(fd, INITIAL_TREE_SIZE) == -1)
+    {
+        perror("ftruncate failed");
+        close(fd);
+        return NULL;
     }
-    
-    // 3. Инициализировать заголовок
-    DiskBTreeHeader* header = (DiskBTreeHeader*)ptr;
-    *header = (DiskBTreeHeader){
+
+    // Отобразить файл в память
+    void *mmap_ptr = mmap(NULL, INITIAL_TREE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mmap_ptr == MAP_FAILED)
+    {
+        perror("mmap failed");
+                close(fd);
+        return NULL;
+    }
+
+    // Инициализировать структуру управления
+    DiskBTree *dbt = malloc(sizeof(DiskBTree));
+    dbt->fd = fd;
+    dbt->mmap_ptr = mmap_ptr;
+    dbt->mmap_size = INITIAL_TREE_SIZE;
+
+    // Инициализировать и заполнить заголовок
+    dbt->header = (DiskBTreeHeader *)mmap_ptr;
+    *dbt->header = (DiskBTreeHeader){
         .t = t,
         .root_block = -1,
         .list_of_free_blocks = -1,
-        .num_blocks = 1
-    };
-    memset(header->reserved, 0, sizeof(header->reserved));
-    
-    // 4. Убрать маппинг
-    munmap(ptr, BLOCK_SIZE);
+        .num_blocks = 1};
+
+    // Занулить резервную область
+    memset(dbt->header->reserved, 0, sizeof(dbt->header->reserved));
+
+    // Принудительная запись на диск
+    if (msync(dbt->header, BLOCK_SIZE, MS_SYNC) == -1)
+    {
+        perror("msync failed");
+        munmap(mmap_ptr, INITIAL_TREE_SIZE);
+        close(fd);
+        free(dbt);
+        return NULL;
+    }
+
+    return dbt;
 }

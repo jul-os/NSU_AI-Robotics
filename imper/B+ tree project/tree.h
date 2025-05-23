@@ -2,6 +2,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef struct DiskBTree DiskBTree;
+
 typedef struct Node
 {
     int * keys;
@@ -12,12 +14,14 @@ typedef struct Node
     void **data_pointers; // points to data i guess
     struct Node *prev;
     struct Node *next;
+    int32_t disk_block; 
 } Node;
 
 typedef struct BTree
 {
     int t;
     Node *root;
+    DiskBTree *disk_tree;  // Ссылка на дисковое представление
 } BTree;
 
 Node *create_node(int t, bool is_leaf);

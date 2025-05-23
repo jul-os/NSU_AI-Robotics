@@ -91,6 +91,13 @@ BTree *create_tree(int t)
     BTree *tree = (BTree *)malloc(sizeof(BTree));
     tree->root = create_node(t, true);
     tree->t = t;
+    tree->disk_tree = NULL;
+    /*
+    TODO
+    btree->root->disk_block = allocate_block(dbt);
+    dbt->header->root_block = btree->root->disk_block;
+    save_node_to_disk(btree->root, dbt);
+    */
     return tree;
 }
 
