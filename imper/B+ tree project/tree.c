@@ -89,34 +89,34 @@ BTree *create_tree(int t)
 
 void *find(int search_key, BTree *tree)
 {
-    Node *C = tree->root;
-    while (!C->leaf)
+    Node *N = tree->root;
+    while (!N->leaf)
     {
         int i = 0;
-        while (i < C->n && search_key <= C->keys[i])
+        while (i < N->n && search_key <= N->keys[i])
         {
             i++;
         }
-        if (i == C->n)
+        if (i == N->n)
         {
-            C = C->children[C->n];
+            N = N->children[N->n];
         }
-        else if (search_key == C->keys[i])
+        else if (search_key == N->keys[i])
         {
-            C = C->children[i + 1];
+            N = N->children[i + 1];
         }
         else
         {
-            C = C->children[i]; // val < C->keys[i]
+            N = N->children[i]; // val < N->keys[i]
         }
     }
-    // now C is a leaf
-    for (int i = 0; i < C->n; i++)
+    // now N is a leaf
+    for (int i = 0; i < N->n; i++)
     {
-        if (C->keys[i] == search_key)
+        if (N->keys[i] == search_key)
         {
             // TODO функция которая достает с диска
-            return C->data_pointers[i]; // fixme тип функции другой скорее всего
+            return N->data_pointers[i]; // fixme тип функции другой скорее всего
         }
     }
     return NULL;
@@ -125,33 +125,33 @@ void *find(int search_key, BTree *tree)
 Node *find_leaf(int search_key, BTree *tree)
 {
     // Начинаем с корня
-    Node *C = tree->root;
-    while (!C->leaf)
+    Node *N = tree->root;
+    while (!N->leaf)
     {
         int i = 0;
-        while (i < C->n && search_key <= C->keys[i])
+        while (i < N->n && search_key <= N->keys[i])
         {
             i++;
         }
-        if (i == C->n)
+        if (i == N->n)
         {
-            C = C->children[C->n];
+            N = N->children[N->n];
         }
-        else if (search_key == C->keys[i])
+        else if (search_key == N->keys[i])
         {
-            C = C->children[i + 1];
+            N = N->children[i + 1];
         }
         else
         {
-            C = C->children[i]; // val < C->keys[i]
+            N = N->children[i]; // val < N->keys[i]
         }
     }
-    // Теперь C это лист, ищем в нем ключ
-    for (int i = 0; i < C->n; i++)
+    // Теперь N это лист, ищем в нем ключ
+    for (int i = 0; i < N->n; i++)
     {
-        if (C->keys[i] == search_key)
+        if (N->keys[i] == search_key)
         {
-            return C;
+            return N;
         }
     }
     return NULL;
@@ -184,7 +184,7 @@ Node *find_parent(BTree *tree, Node *child)
         }
         else
         {
-            current = current->children[i]; // val < C->keys[i]
+            current = current->children[i]; // val < N->keys[i]
         }
     }
     return (current == child) ? parent : NULL;
@@ -442,11 +442,11 @@ int find_child_index(Node *parent, Node *child)
     return index;
 }
 
-void remove_key_and_pointer(Node *N, int key)
+void remove_key_and_pointer(Node *N, int delete_key)
 {
     // task а оно может вообще быть не листом?
     int i = 0;
-    while (i < N->n && N->keys[i] != key)
+    while (i < N->n && N->keys[i] != delete_key)
     {
         i++;
     }
@@ -525,12 +525,13 @@ void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tr
 
 void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index)
 {
-    // if N_prime is left to N
+    // Если N_prime стоит слева от N
     if (N_index > 0 && parent->children[N_index - 1] == N_prime)
     {
+        //Если N не лист
         if (!N->leaf)
         {
-            // Move the last child of N_prime to be the first child of N
+            // Переместить последнего потомка N_prime, чтобы он был первым потомком N
             for (int i = N->n; i > 0; i--)
             {
                 N->keys[i] = N->keys[i - 1];
@@ -547,11 +548,11 @@ void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N
             N->keys[0] = K_prime;
             N->n++;
 
-            // update key in parent
+            // Обновить ключ в родителе
             parent->keys[N_index - 1] = N_prime->keys[N_prime->n - 1];
             N_prime->n--;
         }
-        // else its a leaf
+        // Если N лист
         else
         {
             // same but for keys
@@ -614,10 +615,10 @@ void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N
     }
 }
 
-void delete_entry(Node *N, int K, void *P, BTree *tree)
+void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
 {
     // remove key and pointers from the node
-    remove_key_and_pointer(N, K);
+    remove_key_and_pointer(N, delete_key);
 
     // if (N is the root and N has only one remaining child)
     // then make the child of N the new root of the tree and delete N
@@ -703,10 +704,10 @@ void delete_entry(Node *N, int K, void *P, BTree *tree)
     }
 }
 
-void delete(int key, void *point, BTree *tree)
+void delete(int delete_key, void *delete_pointer, BTree *tree)
 {
-    Node *leaf = find_leaf(key, tree);
-    delete_entry(leaf, key, point, tree);
+    Node *leaf = find_leaf(delete_key, tree);
+    delete_entry(leaf, delete_key, delete_pointer, tree);
 }
 
 int main()
