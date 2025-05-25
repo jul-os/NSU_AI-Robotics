@@ -67,3 +67,5 @@ void free_node(Node *node);
 void free_subtree(Node *node);
 // Освобождение всего B+ дерева 
 void free_tree(BTree *tree);
+
+Node* find_leaf_to_insert(BTree *tree, int key) ;

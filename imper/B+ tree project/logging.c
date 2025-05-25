@@ -44,6 +44,7 @@ void wal_log(int log_fd, const char *format, ...)
 // Восстановление состояния из лога
 void recover_from_log(int log_fd, DiskBTree *dbt, BTree *btree)
 {
+    fprintf(stdout, "were in olg\n");
     FILE *log_file = fdopen(dup(log_fd), "r");
     rewind(log_file);
 
@@ -51,7 +52,7 @@ void recover_from_log(int log_fd, DiskBTree *dbt, BTree *btree)
     int t, key, value, min_key, max_key;
 
     // Читаем начальное значение t
-    if (fscanf(log_file, "t = %d\n", &t) != 1)
+    if (fscanf(log_file, "%d\n", &t) != 1)
     {
         fclose(log_file);
         return;
@@ -74,7 +75,6 @@ void recover_from_log(int log_fd, DiskBTree *dbt, BTree *btree)
                 delete(key, btree);
             }
         }
-        // Другие команды пропускаем при восстановлении
     }
 
     fclose(log_file);

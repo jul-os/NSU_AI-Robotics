@@ -85,19 +85,6 @@ void init_free_blocks(DiskBTree *dbt, int32_t start_block, int32_t count)
     }
     msync(dbt->mmap_ptr + start_block * BLOCK_SIZE, count * BLOCK_SIZE, MS_SYNC);
     msync(dbt->header, BLOCK_SIZE, MS_SYNC);
-
-    // для отладки
-    //  Проверяем, что список инициализирован правильно
-    int32_t current = dbt->header->list_of_free_blocks;
-    int checked_blocks = 0;
-    while (current != -1 && checked_blocks < 16)
-    {
-        int32_t *block_ptr = (int32_t *)((char *)dbt->mmap_ptr + current * BLOCK_SIZE);
-        printf("Block %d → next: %d\n", current, *block_ptr);
-        current = *block_ptr;
-        checked_blocks++;
-    }
-    assert(checked_blocks == count); // Все блоки должны быть в списке
 }
 
 int32_t allocate_block(DiskBTree *dbt)

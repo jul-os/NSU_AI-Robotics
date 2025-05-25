@@ -242,6 +242,8 @@ void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output
                 {
                     fprintf(output, "NO_RESULTS");
                 }
+
+                fprintf(output, "\n");
                 return;
             }
             // иначе мы все еще в нужном диапазоне
@@ -439,6 +441,26 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
     }
 }
 
+Node *find_leaf_to_insert(BTree *tree, int key)
+{
+    if (tree->root == NULL)
+        return NULL;
+
+    Node *current = tree->root;
+    while (!current->leaf)
+    {
+        int i = 0;
+        // Находим первый ключ в узле, который больше или равен искомому
+        while (i < current->n && key >= current->keys[i])
+        {
+            i++;
+        }
+        // Переходим к соответствующему дочернему узлу
+        current = current->children[i];
+    }
+    return current;
+}
+
 void insert(BTree *tree, int insert_key, int value)
 {
     // Если дерево пустое
@@ -465,7 +487,7 @@ void insert(BTree *tree, int insert_key, int value)
         return;
     }
     // Иначе: найти лист, в который нужно вставить
-    Node *L = find_leaf(insert_key, tree);
+    Node *L = find_leaf_to_insert(tree, insert_key);
     if (!L)
     {
         perror("Error: Failed to find leaf node\n");
@@ -561,7 +583,7 @@ void insert(BTree *tree, int insert_key, int value)
 int find_child_index(Node *parent, Node *child)
 {
     int index = 0;
-    while (index <= parent->n && parent->children[index] != child) 
+    while (index <= parent->n && parent->children[index] != child)
     {
         index++;
     }
