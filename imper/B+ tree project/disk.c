@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <bits/mman-shared.h>
+#include <assert.h>
 
 DiskBTree *init_disk(int fd, int t)
 {
@@ -59,6 +60,13 @@ DiskBTree *init_disk(int fd, int t)
     return dbt;
 }
 
+void connect_tree_to_disk(BTree* tree, DiskBTree* dbt) {
+    tree->disk_tree = dbt;
+    tree->root->disk_block = allocate_block(dbt);
+    dbt->header->root_block = tree->root->disk_block;
+    save_node_to_disk(dbt, tree->root);
+}
+
 void init_free_blocks(DiskBTree *dbt, int32_t start_block, int32_t count)
 {
     if (count <= 0 || start_block <= 0)
@@ -93,6 +101,10 @@ void init_free_blocks(DiskBTree *dbt, int32_t start_block, int32_t count)
 
 int32_t allocate_block(DiskBTree *dbt)
 {
+    if (!dbt)
+    {
+        return -1;
+    }
     // Проверить наличие свободных блоков
     if (dbt->header->list_of_free_blocks != -1)
     {
@@ -103,6 +115,8 @@ int32_t allocate_block(DiskBTree *dbt)
         // тк в свободных блоках первые 4 байта указывают на следующий свободный блок то вот этим мы усстанвливаем начало списка на следующий
         dbt->header->list_of_free_blocks = *block_ptr;
         msync(dbt->header, BLOCK_SIZE, MS_SYNC);
+        // Явная инициализация нового блока
+        memset((char *)dbt->mmap_ptr + free_block * BLOCK_SIZE, 0, BLOCK_SIZE);
         return free_block;
     }
 
@@ -132,44 +146,87 @@ int32_t allocate_block(DiskBTree *dbt)
 void free_block(DiskBTree *dbt, int32_t block_num)
 {
     // Валидация номера блока
-    if (block_num <= 0 || block_num >= dbt->header->num_blocks) {
+    if (block_num <= 0 || block_num >= dbt->header->num_blocks)
+    {
         fprintf(stderr, "Invalid block number: %d\n", block_num);
         return;
     }
     // Получаем указатель на блок
-    int32_t* block_ptr = (int32_t*)((char*)dbt->mmap_ptr + block_num * BLOCK_SIZE);
-    
-    // Добавляем блок в начало списка
+    int32_t *block_ptr = (int32_t *)((char *)dbt->mmap_ptr + block_num * BLOCK_SIZE);
+
+    // Очищаем данные узла
+    memset(block_ptr, 0, BLOCK_SIZE);
+
+    // Добавляем блок в начало списка свободных узлов
     *block_ptr = dbt->header->list_of_free_blocks;
     dbt->header->list_of_free_blocks = block_num;
-    
+
     // Синхронизируем изменения
-    msync(block_ptr, sizeof(int32_t), MS_SYNC); // Сам блок
-    msync(&dbt->header->list_of_free_blocks, sizeof(int32_t), MS_SYNC); // Заголовок
+    msync(block_ptr, BLOCK_SIZE, MS_SYNC);
+    msync(&dbt->header->list_of_free_blocks, sizeof(int32_t), MS_SYNC);
 }
 
-
-/*
-
-// При удалении узла
-void delete_node(DiskBTree *dbt, Node *node) {
-    if (node->disk_block != -1) {
-        free_block(dbt, node->disk_block);
-        node->disk_block = -1;
+void save_node_to_disk(DiskBTree *dbt, Node *node)
+{
+    if (!dbt || !node)
+    {
+        fprintf(stderr, "Invalid arguments to save_node_to_disk\n");
+        return;
     }
-    // ... остальная логика удаления
-}
-
-// При создании нового узла
-Node* create_node_with_block(DiskBTree *dbt, int t, bool is_leaf) {
-    Node *node = create_node(t, is_leaf);
-    if (node) {
+    // Проверяем, что у узла есть связанный блок на диске
+    if (node->disk_block == -1)
+    {
+        // Если нет - выделяем новый блок
         node->disk_block = allocate_block(dbt);
-        if (node->disk_block == -1) {
-            free(node);
-            return NULL;
+        if (node->disk_block == -1)
+        {
+            perror("Failed to allocate block for node");
+            return;
         }
     }
-    return node;
+
+    // Получаем указатель на блок в mmap области
+    DiskNode *disk_node = (DiskNode *)((char *)dbt->mmap_ptr + node->disk_block * BLOCK_SIZE);
+
+    // Заполняем заголовок узла
+    disk_node->is_leaf = node->leaf;
+    disk_node->num_keys = node->n;
+
+    // Копируем ключи
+    for (int i = 0; i < node->n; i++)
+    {
+        disk_node->keys[i] = node->keys[i];
+    }
+
+    if (node->leaf)
+    {
+        // Копируем значения
+        for (int i = 0; i < node->n; i++)
+        {
+            disk_node->values[i] = *((int32_t *)node->data_pointers[i]);
+        }
+
+        // Связи между листьями
+        disk_node->prev_leaf = (node->prev) ? node->prev->disk_block : -1;
+        disk_node->next_leaf = (node->next) ? node->next->disk_block : -1;
+    }
+    else
+    {
+        // Копируем указатели на детей
+        for (int i = 0; i <= node->n; i++)
+        {
+            disk_node->children[i] = (node->children[i]) ? node->children[i]->disk_block : -1;
+        }
+    }
+
+    msync(disk_node, BLOCK_SIZE, MS_SYNC);
 }
-*/
+
+int get_value_from_disk(DiskBTree *dbt, Node *leaf, int index)
+{
+    assert(dbt && leaf);
+    assert(index >= 0 && index < leaf->n);
+    assert(leaf->disk_block != -1);
+    DiskNode *disk_leaf = (DiskNode *)((char *)dbt->mmap_ptr + leaf->disk_block * BLOCK_SIZE);
+    return disk_leaf->values[index];
+}

@@ -48,7 +48,7 @@ int main()
         return EXIT_FAILURE;
     }
 
-    //Инициализируем структуры
+    // Инициализируем структуры
     DiskBTree *dbt = init_disk(tree_fd, t);
     if (!dbt)
     {
@@ -58,7 +58,7 @@ int main()
         return EXIT_FAILURE;
     }
     BTree *btree = create_tree(t);
-    btree->disk_tree = dbt;
+    connect_tree_to_disk(btree, dbt);
 
     // Проверяем размер файла для определения, нужно ли инициализировать
     struct stat st;
@@ -104,16 +104,22 @@ int main()
         {
             if (fscanf(input, "%d", &key) == 1)
             {
-                // Реализация поиска
-                fprintf(output, "SEARCH %d\n", key);
+                int search_result;
+                if (find(dbt, key, btree, &search_result))
+                {
+                    fprintf(output, "FOR KEY %d SEARCH FOUND %d\n", key, search_result);
+                }
+                else
+                {
+                    fprintf(output, "SEARCH FOR KEY %d NOT FOUND\n", key);
+                }
             }
         }
         else if (strcmp(command, "RANGE") == 0)
         {
             if (fscanf(input, "%d %d", &min_key, &max_key) == 2)
             {
-                // Реализация диапазонного запроса
-                fprintf(output, "RANGE %d %d\n", min_key, max_key);
+                range_query(btree, min_key, max_key, dbt, output);
             }
         }
     }

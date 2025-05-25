@@ -3,15 +3,15 @@
 #include <stdint.h>
 
 #define BLOCK_SIZE 4096
-#define INITIAL_TREE_SIZE (BLOCK_SIZE * 256)                             // 1MB
-#define T_MAX 32                                                         // Максимальный порядок дерева
+#define INITIAL_TREE_SIZE (BLOCK_SIZE * 256) // 1MB
+#define T_MAX 32                             // Максимальный порядок дерева
 
 #pragma pack(push, 1)
 // Структура описания заголовка файла дерева
 typedef struct DiskBTreeHeader
 {
     int32_t t;                   // Порядок дерева (min degree)
-    int32_t root_block;          // Смещение корня в блоках 
+    int32_t root_block;          // Смещение корня в блоках
     int32_t list_of_free_blocks; // Голова списка свободных блоков (-1 если нет)
     int32_t num_blocks;          // Общее количество блоков в файле
     uint8_t reserved[4080];      // Резерв (выравнивание до 4096 байт)
@@ -50,14 +50,26 @@ typedef struct
 } DiskNode;
 #pragma pack(pop)
 
-//инициализирует структуры для начала работы с диском 
+// инициализирует структуры для начала работы с диском
 DiskBTree *init_disk(int fd, int t);
 
-// Выделяет новый блок (либо из свободных, либо расширяет файл)
-int32_t allocate_block(DiskBTree* dbt);
+// Подключает дерево к дисковому хранилищу
+void connect_tree_to_disk(BTree* tree, DiskBTree* dbt);
 
-// Возвращает блок в список свободных
-void free_block(DiskBTree* dbt, int32_t block_num);
+// Выделяет новый блок (либо из свободных, либо расширяет файл)
+int32_t allocate_block(DiskBTree *dbt);
+
+// Удаляет содержимое и озвращает блок в список свободных
+void free_block(DiskBTree *dbt, int32_t block_num);
 
 // Инициализирует список свободных блоков связывая их в односвязный список
-void init_free_blocks(DiskBTree* dbt, int32_t start_block, int32_t count);
+void init_free_blocks(DiskBTree *dbt, int32_t start_block, int32_t count);
+
+// Записывает узел на диск
+void save_node_to_disk(DiskBTree *dbt, Node *node);
+
+// Достает информацию из памяти
+Node *load_node_from_disk(DiskBTree *dbt, int32_t block_num);
+
+// Возвращает значение 
+int get_value_from_disk(DiskBTree *dbt, Node *leaf, int index);

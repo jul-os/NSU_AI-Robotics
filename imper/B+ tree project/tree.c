@@ -78,16 +78,10 @@ BTree *create_tree(int t)
     tree->root = create_node(t, true);
     tree->t = t;
     tree->disk_tree = NULL;
-    /*
-    TODO
-    btree->root->disk_block = allocate_block(dbt);
-    dbt->header->root_block = btree->root->disk_block;
-    save_node_to_disk(btree->root, dbt);
-    */
     return tree;
 }
 
-void *find(int search_key, BTree *tree)
+bool find(DiskBTree *dbt, int search_key, BTree *tree, int *out_value)
 {
     // Начинаем с корня, ищем нужный N
     Node *N = tree->root;
@@ -111,16 +105,16 @@ void *find(int search_key, BTree *tree)
             N = N->children[i]; // val < N->keys[i]
         }
     }
-    //Теперь N это лист, ищем в нем ключ
+    // Теперь N это лист, ищем в нем ключ
     for (int i = 0; i < N->n; i++)
     {
         if (N->keys[i] == search_key)
         {
-            // TODO функция которая достает с диска
-            return N->data_pointers[i]; // fixme тип функции другой скорее всего
+            *out_value = get_value_from_disk(dbt, N, i);
+            return true;
         }
     }
-    return NULL;
+    return false;
 }
 
 Node *find_leaf(int search_key, BTree *tree)
@@ -191,15 +185,17 @@ Node *find_parent(BTree *tree, Node *child)
     return (current == child) ? parent : NULL;
 }
 
-void range_query(BTree *tree, int min_k, int max_k)
+void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output)
 {
-    if (!tree || !tree->root)
+    if (!tree || !tree->root || !output)
     {
+        fprintf(stderr, "Invalid arguments to range_query\n");
         return;
     }
     Node *start_node = find_leaf(min_k, tree);
     if (!start_node)
     {
+        fprintf(output, "RANGE %d %d: NO_RESULTS\n", min_k, max_k);
         return;
     }
     int i = 0;
@@ -208,21 +204,35 @@ void range_query(BTree *tree, int min_k, int max_k)
     {
         i++;
     }
+    bool found_any = false;
+    fprintf(output, "RANGE %d %d: ", min_k, max_k);
     while (start_node != NULL)
     {
+        // идем по узлу, проверяем диапазон
         for (; i < start_node->n; i++)
         {
             if (start_node->keys[i] > max_k)
             {
+                if (!found_any)
+                {
+                    fprintf(output, "NO_RESULTS");
+                }
                 return;
             }
-            // else were still in the right diaposon
-            // TODO take from mem
+            // иначе мы все еще в нужном диапазоне
+            int value = get_value_from_disk(dbt, start_node, i);
+            fprintf(output, "%d ", value);
+            found_any = true;
         }
-
+        //при необходимости переходим к следующему листу
         start_node = start_node->next;
         i = 0;
     }
+    if (!found_any)
+    {
+        fprintf(output, "NO_RESULTS");
+    }
+    fprintf(output, "\n");
 }
 
 void insert_into_leaf(Node *L, int insert_key, void *insert_pointer)
@@ -403,7 +413,6 @@ void insert(BTree *tree, int insert_key, void *insert_pointer)
         // Ищем точку разделения
         int split_pos = total_keys / 2;
         int K_prime = temp_keys[split_pos];
-        // TODO тут где-то запись на диск еще ))))
         // Обновляем L и L_prime
         L->n = split_pos;
         for (i = 0; i < split_pos; i++)
