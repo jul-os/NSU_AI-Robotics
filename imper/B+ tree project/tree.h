@@ -59,3 +59,10 @@ void remove_key_and_value(BTree* tree, Node *N, int delete_key);
 void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tree);
 // Перераспределение узлов при заимствовании
 void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index, BTree* tree);
+
+//Освобождение узла
+void free_node(Node *node);
+// Рекурсивная функция для освобождения всех узлов
+void free_subtree(Node *node);
+// Освобождение всего B+ дерева 
+void free_tree(BTree *tree);

@@ -73,3 +73,6 @@ Node *load_node_from_disk(DiskBTree *dbt, int32_t block_num);
 
 // Возвращает значение 
 int get_value_from_disk(DiskBTree *dbt, Node *leaf, int index);
+
+// Освобождение дискового представления дерева
+void free_disk(DiskBTree *dbt);

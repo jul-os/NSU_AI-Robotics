@@ -203,7 +203,7 @@ void save_node_to_disk(DiskBTree *dbt, Node *node)
         // Копируем значения
         for (int i = 0; i < node->n; i++)
         {
-            disk_node->values[i] = *((int32_t *)node->data_pointers[i]);
+            disk_node->values[i] = *((int32_t *)node->values[i]);
         }
 
         // Связи между листьями
@@ -229,4 +229,21 @@ int get_value_from_disk(DiskBTree *dbt, Node *leaf, int index)
     assert(leaf->disk_block != -1);
     DiskNode *disk_leaf = (DiskNode *)((char *)dbt->mmap_ptr + leaf->disk_block * BLOCK_SIZE);
     return disk_leaf->values[index];
+}
+
+void free_disk(DiskBTree *dbt) {
+    if (!dbt) return;
+    
+    // Синхронизируем изменения перед освобождением
+    if (dbt->mmap_ptr) {
+        msync(dbt->mmap_ptr, dbt->mmap_size, MS_SYNC);
+        munmap(dbt->mmap_ptr, dbt->mmap_size);
+    }
+    
+    // Закрываем файловый дескриптор
+    if (dbt->fd != -1) {
+        close(dbt->fd);
+    }
+    
+    free(dbt);
 }

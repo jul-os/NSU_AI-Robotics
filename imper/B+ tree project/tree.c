@@ -40,7 +40,7 @@ Node *create_node(int t, bool is_leaf, BTree *tree)
     if (is_leaf)
     {
         // Для листа - указатели на данные
-        new_node->values = (int*)malloc((2 * t - 1) * sizeof(int));
+        new_node->values = (int *)malloc((2 * t - 1) * sizeof(int));
         if (!new_node->values)
         {
             perror("malloc failed on node data pointers");
@@ -64,7 +64,7 @@ Node *create_node(int t, bool is_leaf, BTree *tree)
             free(new_node);
             return NULL;
         }
-        memset(new_node->values, 0, (2 * t) * sizeof(Node*));
+        memset(new_node->values, 0, (2 * t) * sizeof(Node *));
         new_node->values = NULL; // Не используем для данных
         new_node->prev = NULL;
         new_node->next = NULL;
@@ -260,7 +260,7 @@ void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output
     fprintf(output, "\n");
 }
 
-void insert_into_leaf(BTree *tree, Node *L, int insert_key,int value)
+void insert_into_leaf(BTree *tree, Node *L, int insert_key, int value)
 {
     // Найти место для вставки
     int insert_pos = 0;
@@ -904,4 +904,52 @@ void delete(int delete_key, BTree *tree)
         }
     }
     delete_entry(leaf, delete_key, delete_pointer, tree);
+}
+
+void free_node(Node *node)
+{
+    if (!node)
+        return;
+
+    free(node->keys);
+
+    if (!node->leaf)
+    {
+        free(node->children);
+    }
+    else
+    {
+        free(node->values);
+    }
+
+    free(node);
+}
+
+void free_subtree(Node *node)
+{
+    if (!node)
+    {
+        return;
+    }
+
+    if (!node->leaf)
+    {
+        for (int i = 0; i <= node->n; i++)
+        {
+            free_subtree(node->children[i]);
+        }
+    }
+
+    free_node(node);
+}
+
+void free_tree(BTree *tree)
+{
+    if (!tree)
+    {
+        return;
+    }
+
+    free_subtree(tree->root);
+    free(tree);
 }

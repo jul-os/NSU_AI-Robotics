@@ -1,4 +1,5 @@
 #include "tree.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -48,6 +49,15 @@ int main()
         return EXIT_FAILURE;
     }
 
+    int log_fd = open(log_file_name, O_RDWR | O_CREAT, 0644);
+    if (log_fd == -1)
+    {
+        perror("Failed to open log file");
+        fclose(input);
+        fclose(output);
+        return EXIT_FAILURE;
+    }
+
     // Инициализируем структуры
     DiskBTree *dbt = init_disk(tree_fd, t);
     if (!dbt)
@@ -60,23 +70,24 @@ int main()
     BTree *btree = create_tree(t);
     connect_tree_to_disk(btree, dbt);
 
-    // Проверяем размер файла для определения, нужно ли инициализировать
     struct stat st;
-    if (fstat(tree_fd, &st) == -1)
+    // Проверяем размер. если файл логов не пуст, значит нам нужно восстанавливать из него
+    // Иначе мы в него только записываем
+    // Восстанавливаем состояние если лог не пустой
+    if (st.st_size > 0)
     {
-        perror("Failed to get file stats");
-        close(tree_fd);
-        fclose(output);
-        fclose(input);
-        return EXIT_FAILURE;
+        recover_from_log(log_fd, dbt, btree);
+    }
+    else
+    {
+        // Инициализируем новый лог
+        wal_log(log_fd, "t = %d\n", t);
     }
 
     // тк гарантировали что файл новый, инициализируем заголовок
-    if (st.st_size == 0)
-    {
-        init_empty_tree(data_file_name, t);
-        // запись в сам файл то есть mmap будет происходить в файле disk.c тоже
-    }
+
+    init_empty_tree(data_file_name, t);
+    // запись в сам файл то есть mmap будет происходить в файле disk.c тоже
 
     // Основной цикл обработки команд
     char command[16];
@@ -87,16 +98,16 @@ int main()
         {
             if (fscanf(input, "%d %d", &key, &value) == 2)
             {
+                wal_log(log_fd, "INSERT %d %d\n", key, value);
                 insert(btree, key, value);
-                fprintf(output, "INSERT %d %d\n", key, value);
             }
         }
         else if (strcmp(command, "DELETE") == 0)
         {
             if (fscanf(input, "%d", &key) == 1)
             {
+                wal_log(log_fd, "DELETE %d\n", key);
                 delete(key, btree);
-                fprintf(output, "DELETE %d\n", key);
             }
         }
         else if (strcmp(command, "SEARCH") == 0)
@@ -122,5 +133,18 @@ int main()
             }
         }
     }
+
+    // Перед завершением синхронизируем все изменения
+    fsync(tree_fd);
+    fsync(log_fd);
+
+    // Закрываем ресурсы
+    close(tree_fd);
+    close(log_fd);
+    fclose(output);
+    fclose(input);
+    free_tree(btree);
+    free_disk(dbt);   // TODO
+
     return 0;
 }
