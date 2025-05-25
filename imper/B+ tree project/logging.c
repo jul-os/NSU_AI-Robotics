@@ -44,7 +44,6 @@ void wal_log(int log_fd, const char *format, ...)
 // Восстановление состояния из лога
 void recover_from_log(int log_fd, DiskBTree *dbt, BTree *btree)
 {
-    fprintf(stdout, "were in olg\n");
     FILE *log_file = fdopen(dup(log_fd), "r");
     rewind(log_file);
 
