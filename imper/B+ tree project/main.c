@@ -71,7 +71,7 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // Если файл новый, инициализируем заголовок
+    // тк гарантировали что файл новый, инициализируем заголовок
     if (st.st_size == 0)
     {
         init_empty_tree(data_file_name, t);
@@ -81,14 +81,13 @@ int main()
     // Основной цикл обработки команд
     char command[16];
     int key, value, min_key, max_key;
-    // fixme как доделаю тут тоже сделать норм
     while (fscanf(input, "%15s", command) == 1)
     {
         if (strcmp(command, "INSERT") == 0)
         {
             if (fscanf(input, "%d %d", &key, &value) == 2)
             {
-                // Реализация вставки
+                insert(btree, key, value);
                 fprintf(output, "INSERT %d %d\n", key, value);
             }
         }
@@ -96,7 +95,7 @@ int main()
         {
             if (fscanf(input, "%d", &key) == 1)
             {
-                // Реализация удаления
+                delete(key, btree);
                 fprintf(output, "DELETE %d\n", key);
             }
         }
@@ -123,10 +122,5 @@ int main()
             }
         }
     }
-    // bptree_init(t, fileno(data_file), fileno(log_file));
-    //  bptree_recover_from_wal();  // если нужно
-
-    // тут можно будет читать операции и вызывать insert/search/delete из tree.c
-
     return 0;
 }

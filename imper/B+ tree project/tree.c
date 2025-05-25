@@ -13,7 +13,7 @@ void *tree_memory = NULL;
 size_t tree_memory_size = 0;
 int tree_fd = -1;
 
-Node *create_node(int t, bool is_leaf)
+Node *create_node(int t, bool is_leaf, BTree *tree)
 {
     // Создаем новый узел
     Node *new_node = (Node *)malloc(sizeof(Node));
@@ -40,14 +40,15 @@ Node *create_node(int t, bool is_leaf)
     if (is_leaf)
     {
         // Для листа - указатели на данные
-        new_node->data_pointers = (void **)malloc((2 * t - 1) * sizeof(void *));
-        if (!new_node->data_pointers)
+        new_node->values = (int*)malloc((2 * t - 1) * sizeof(int));
+        if (!new_node->values)
         {
             perror("malloc failed on node data pointers");
             free(new_node->keys);
             free(new_node);
             return NULL;
         }
+        memset(new_node->values, 0, (2 * t - 1) * sizeof(int));
         new_node->children = NULL; // Листья не имеют дочерних узлов
         new_node->prev = NULL;
         new_node->next = NULL;
@@ -63,11 +64,35 @@ Node *create_node(int t, bool is_leaf)
             free(new_node);
             return NULL;
         }
-        new_node->data_pointers = NULL; // Не используем для данных
+        memset(new_node->values, 0, (2 * t) * sizeof(Node*));
+        new_node->values = NULL; // Не используем для данных
         new_node->prev = NULL;
         new_node->next = NULL;
     }
+    // Если дерево связано с диском, сразу выделяем блок
+    if (tree->disk_tree)
+    {
+        new_node->disk_block = allocate_block(tree->disk_tree);
+        if (new_node->disk_block == -1)
+        {
+            fprintf(stderr, "Failed to allocate disk block for new node\n");
+            // Освобождаем уже выделенную память
+            if (is_leaf)
+            {
+                free(new_node->values);
+            }
+            else
+            {
+                free(new_node->children);
+            }
+            free(new_node->keys);
+            free(new_node);
+            return NULL;
+        }
 
+        // Сохраняем пустой узел на диск
+        save_node_to_disk(tree->disk_tree, new_node);
+    }
     return new_node;
 }
 
@@ -75,7 +100,7 @@ BTree *create_tree(int t)
 {
     // Создаем дерево и заполняем его
     BTree *tree = (BTree *)malloc(sizeof(BTree));
-    tree->root = create_node(t, true);
+    tree->root = create_node(t, true, tree);
     tree->t = t;
     tree->disk_tree = NULL;
     return tree;
@@ -224,7 +249,7 @@ void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output
             fprintf(output, "%d ", value);
             found_any = true;
         }
-        //при необходимости переходим к следующему листу
+        // при необходимости переходим к следующему листу
         start_node = start_node->next;
         i = 0;
     }
@@ -235,7 +260,7 @@ void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output
     fprintf(output, "\n");
 }
 
-void insert_into_leaf(Node *L, int insert_key, void *insert_pointer)
+void insert_into_leaf(BTree *tree, Node *L, int insert_key,int value)
 {
     // Найти место для вставки
     int insert_pos = 0;
@@ -248,28 +273,57 @@ void insert_into_leaf(Node *L, int insert_key, void *insert_pointer)
     for (int i = L->n; i > insert_pos; i--)
     {
         L->keys[i] = L->keys[i - 1];
-        L->data_pointers[i] = L->data_pointers[i - 1];
+        L->values[i] = L->values[i - 1];
     }
     // вставить новый ключ и указатель
     L->keys[insert_pos] = insert_key;
-    L->data_pointers[insert_pos] = insert_pointer;
+    L->values[insert_pos] = value;
     L->n++;
-    // оказалось что вообще-то указатель из родителя в лист не обязан указывать на первый элемент листа поэтому типа все в этой функции
+    // оказалось что вообще-то указатель из родителя в лист не обязан указывать на первый элемент листа поэтому все в этой функции
+    if (tree->disk_tree)
+    {
+        save_node_to_disk(tree->disk_tree, L);
+    }
 }
 
 void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
 {
+    // Случай 1: N - корень, создаем новый корень
     if (tree->root == N)
     {
-        Node *new_root = create_node(tree->t, false);
+        Node *new_root = create_node(tree->t, false, tree);
+        if (!new_root)
+        {
+            perror("Failed to create new root node\n");
+            return;
+        }
         new_root->keys[0] = K_prime;
         new_root->children[0] = N;
         new_root->children[1] = N_prime;
         new_root->n = 1;
         tree->root = new_root;
+        // Сохраняем изменения на диск
+        if (tree->disk_tree)
+        {
+            save_node_to_disk(tree->disk_tree, new_root);
+            tree->disk_tree->header->root_block = new_root->disk_block;
+            msync(tree->disk_tree->header, BLOCK_SIZE, MS_SYNC);
+
+            // Обновляем старых детей (N и N_prime)
+            save_node_to_disk(tree->disk_tree, N);
+            save_node_to_disk(tree->disk_tree, N_prime);
+        }
         return;
     }
+    // Случай 2:
+    // Находим родителя
     Node *parent = find_parent(tree, N);
+    if (!parent)
+    {
+        perror("Failed to find parent\n");
+        return;
+    }
+    // В родителе есть место
     if (parent->n < 2 * tree->t - 1)
     {
         int insert_pos = 0;
@@ -277,8 +331,8 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         {
             insert_pos++;
         }
-        insert_pos++; // inserting after N
-        // move to the right
+        insert_pos++; // Вставляем после N
+                      // Сдвигаем элементы вправо
         for (int i = parent->n; i >= insert_pos; i--)
         {
             parent->keys[i] = parent->keys[i - 1];
@@ -287,18 +341,29 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         {
             parent->children[i] = parent->children[i - 1];
         }
-        // insert K_prime & N_prime
+        // Вставляем K_prime и N_prime
         parent->keys[insert_pos - 1] = K_prime;
         parent->children[insert_pos] = N_prime;
         parent->n++;
+        // Сохраняем изменения на диск
+        if (tree->disk_tree)
+        {
+            save_node_to_disk(tree->disk_tree, parent);
+        }
     }
-    // else parent doesnt have enough dpace
+    // Родитель заполнен, нужно разделить
     else
     {
         int total_keys = parent->n + 1;
         int *temp_keys = malloc(total_keys * sizeof(int));
         Node **temp_pointers = malloc((total_keys + 1) * sizeof(Node *));
-
+        if (!temp_keys || !temp_pointers)
+        {
+            perror("Error: Memory allocation failed\n");
+            free(temp_keys);
+            free(temp_pointers);
+            return;
+        }
         // Копируем существующие данные во временный массив
         int i = 0, j = 0;
         while (i <= parent->n && parent->children[i] != N)
@@ -330,11 +395,19 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
             j++;
         }
 
-        // Определяем точку разделения
+        // Разделяем родителя
         int split_pos = total_keys / 2;
         int K_double_prime = temp_keys[split_pos];
 
-        Node *P_prime = create_node(tree->t, false);
+        Node *P_prime = create_node(tree->t, false, tree);
+        if (!P_prime)
+        {
+            perror("Error: Failed to create new node\n");
+            free(temp_keys);
+            free(temp_pointers);
+            return;
+        }
+        // Обновляем исходного родителя
         parent->n = 0;
         for (i = 0; i < split_pos; i++)
         {
@@ -343,7 +416,7 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
             parent->n++;
         }
         parent->children[i] = temp_pointers[i];
-
+        // Заполняем нового родителя P_prime
         P_prime->n = 0;
         for (i = split_pos + 1, j = 0; i < total_keys; i++, j++)
         {
@@ -354,59 +427,93 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         P_prime->children[j] = temp_pointers[i];
         free(temp_keys);
         free(temp_pointers);
+        // Сохраняем изменения на диск перед рекурсивным вызовом
+        if (tree->disk_tree)
+        {
+            save_node_to_disk(tree->disk_tree, parent);
+            save_node_to_disk(tree->disk_tree, P_prime);
+        }
 
+        // Рекурсивно вставляем K_double_prime в родителя
         insert_into_parent(tree, parent, K_double_prime, P_prime);
     }
 }
 
-// assignment тут короче указатель непонятно на что, когда работу с диском прибавим надо будет посмотреть что здесь должно быть
-void insert(BTree *tree, int insert_key, void *insert_pointer)
+void insert(BTree *tree, int insert_key, int value)
 {
     // Если дерево пустое
     if (tree->root == NULL || tree->root->n == 0)
     // Вставляем узел L который также является корнем
     {
-        Node *L = create_node(tree->t, true);
+        Node *L = create_node(tree->t, true, tree);
+        if (!L)
+        {
+            perror("Error: Failed to create root leaf node\n");
+            return;
+        }
         L->keys[0] = insert_key;
+        L->values[0] = value;
         L->n = 1;
         tree->root = L;
+        // Сохраняем на диск
+        if (tree->disk_tree)
+        {
+            save_node_to_disk(tree->disk_tree, L);
+            tree->disk_tree->header->root_block = L->disk_block;
+            msync(tree->disk_tree->header, BLOCK_SIZE, MS_SYNC);
+        }
         return;
     }
     // Иначе: найти лист, в который нужно вставить
     Node *L = find_leaf(insert_key, tree);
-
+    if (!L)
+    {
+        perror("Error: Failed to find leaf node\n");
+        return;
+    }
     // Если в узле еще есть место для вставки, вставляем туда
     if (L->n < 2 * tree->t - 1)
     {
-        insert_into_leaf(L, insert_key, insert_pointer);
+        insert_into_leaf(tree, L, insert_key, value);
     }
     else
     {
         // Иначе разбиваем лист
-        Node *L_prime = create_node(tree->t, true);
+        Node *L_prime = create_node(tree->t, true, tree);
+        if (!L_prime)
+        {
+            perror("Error: Failed to create L_prime node\n");
+            return;
+        }
         // Временно перемещаем ключи и указатели
         int total_keys = L->n + 1;
         int *temp_keys = malloc(total_keys * sizeof(int));
-        // fixme void pointers or Node pointers????
-        void **temp_pointers = malloc(total_keys * sizeof(void *));
+        int *temp_values = malloc(total_keys * sizeof(int));
+        if (!temp_keys || !temp_values)
+        {
+            perror("Error: Memory allocation failed during split\n");
+            free(temp_keys);
+            free(temp_values);
+            return;
+        }
         // Копируем ключи и ищем место для нового ключа
         int i = 0, j = 0;
         while (i < L->n && insert_key > L->keys[i])
         {
             temp_keys[j] = L->keys[i];
-            temp_pointers[j] = L->data_pointers[i];
+            temp_values[j] = L->values[i];
             i++;
             j++;
         }
         // Вставляем новый ключ
         temp_keys[j] = insert_key;
-        temp_pointers[j] = insert_pointer;
+        temp_values[j] = value;
         j++;
         // Копируем оставшиеся ключи
         while (i < L->n)
         {
             temp_keys[j] = L->keys[i];
-            temp_pointers[j] = L->data_pointers[i];
+            temp_values[j] = L->values[i];
             i++;
             j++;
         }
@@ -418,24 +525,34 @@ void insert(BTree *tree, int insert_key, void *insert_pointer)
         for (i = 0; i < split_pos; i++)
         {
             L->keys[i] = temp_keys[i];
-            L->data_pointers[i] = temp_pointers[i];
+            L->values[i] = temp_values[i];
         }
         L_prime->n = total_keys - split_pos;
         for (i = split_pos; i < total_keys; i++)
         {
             L_prime->keys[i - split_pos] = temp_keys[i];
-            L_prime->data_pointers[i - split_pos] = temp_pointers[i];
+            L_prime->values[i - split_pos] = temp_values[i];
         }
         // ОБновляем отношения между листами
         L_prime->next = L->next;
         if (L->next != NULL)
         {
             L->next->prev = L_prime;
+            if (tree->disk_tree)
+            {
+                save_node_to_disk(tree->disk_tree, L->next);
+            }
         }
         L->next = L_prime;
         L_prime->prev = L;
         free(temp_keys);
-        free(temp_pointers);
+        free(temp_values);
+        // Сохраняем изменения на диск перед обновлением родителя
+        if (tree->disk_tree)
+        {
+            save_node_to_disk(tree->disk_tree, L);
+            save_node_to_disk(tree->disk_tree, L_prime);
+        }
         // Обновляем родителя
         insert_into_parent(tree, L, K_prime, L_prime);
     }
@@ -451,25 +568,33 @@ int find_child_index(Node *parent, Node *child)
     return index;
 }
 
-void remove_key_and_pointer(Node *N, int delete_key)
+void remove_key_and_value(BTree *tree, Node *N, int delete_key)
 {
-    // task а оно может вообще быть не листом?
+    // Находим позицию ключа
     int i = 0;
     while (i < N->n && N->keys[i] != delete_key)
     {
         i++;
     }
+    // Проверяем, найден ли ключ
+    if (i >= N->n)
+    {
+        fprintf(stderr, "Error: Key %d not found in node\n", delete_key);
+        return;
+    }
 
-    // if leaf, shilf keys and data pointers
+    // Для листа Сдвигаем ключи и указатели на данные
     if (N->leaf)
     {
         for (; i < N->n - 1; i++)
         {
             N->keys[i] = N->keys[i + 1];
-            N->data_pointers[i] = N->data_pointers[i + 1];
+            N->values[i] = N->values[i + 1];
         }
+        N->keys[N->n - 1] = 0;
+        N->values[N->n - 1] = NULL;
     }
-    // if interanal node, shift keys and children pointers
+    // Для внутреннего узла Сдвигаем ключи и указатели на потомков
     else
     {
         for (; i < N->n - 1; i++)
@@ -477,19 +602,31 @@ void remove_key_and_pointer(Node *N, int delete_key)
             N->keys[i] = N->keys[i + 1];
             N->children[i] = N->children[i + 1];
         }
+        // Сдвигаем последний указатель на ребенка
+        N->children[N->n - 1] = N->children[N->n];
+        N->children[N->n] = NULL;
+
+        // Очищаем последний ключ
+        N->keys[N->n - 1] = 0;
     }
     N->n--;
+    // Сохраняем изменения на диск
+    if (tree->disk_tree)
+    {
+        save_node_to_disk(tree->disk_tree, N);
+    }
 }
 
 void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tree)
 {
     if (!N->leaf)
     {
+        // Для внутренних узлов:
         // последний ключ левого узла теперь ключ который разделял левый и правый ключи в родительском узле
         N_prime->keys[N_prime->n] = K_prime;
         N_prime->n++;
 
-        // copy from N to N_prime
+        // Копируем ключи и детей из N в N_prime
         for (int i = 0; i < N->n; i++)
         {
             N_prime->keys[N_prime->n + i] = N->keys[i];
@@ -500,29 +637,46 @@ void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tr
     }
     else
     {
+        // Для листовых узлов:
+        //  Копируем ключи и данные
         for (int i = 0; i < N->n; i++)
         {
             N_prime->keys[N_prime->n + i] = N->keys[i];
-            N_prime->data_pointers[N_prime->n + i] = N->data_pointers[i];
+            N_prime->values[N_prime->n + i] = N->values[i];
         }
         N_prime->n += N->n;
 
-        // Update leaf linked list
+        // Обновляем связи между листьями
         N_prime->next = N->next;
         if (N->next != NULL)
         {
             N->next->prev = N_prime;
+            if (tree->disk_tree)
+            {
+                save_node_to_disk(tree->disk_tree, N->next);
+            }
         }
         // N_prime-> prev и N_prime->prev->next обновлять не нужно
         // N_prime-> next = N->next
         // N->next->prev = N_prime
         // N->prev удалится при удалении узла ниже
     }
+    // Сохраняем изменения на диск перед удалением
+    if (tree->disk_tree)
+    {
+        save_node_to_disk(tree->disk_tree, N_prime);
+        save_node_to_disk(tree->disk_tree, parent);
+    }
     delete_entry(parent, K_prime, N, tree);
+    // Освобождаем память и дисковые ресурсы
+    if (tree->disk_tree && N->disk_block != -1)
+    {
+        free_block(tree->disk_tree, N->disk_block);
+    }
     free(N->keys);
     if (N->leaf)
     {
-        free(N->data_pointers);
+        free(N->values);
     }
     else
     {
@@ -531,8 +685,9 @@ void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tr
     free(N);
 }
 
-void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index)
+void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index, BTree *tree)
 {
+
     // Если N_prime стоит слева от N
     if (N_index > 0 && parent->children[N_index - 1] == N_prime)
     {
@@ -563,36 +718,36 @@ void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N
         // Если N лист
         else
         {
-            // same but for keys
+            // перемещаем ключи и указатели
             for (int i = N->n; i > 0; i--)
             {
                 N->keys[i] = N->keys[i - 1];
-                N->data_pointers[i] = N->data_pointers[i - 1];
+                N->values[i] = N->values[i - 1];
             }
 
             N->keys[0] = N_prime->keys[N_prime->n - 1];
-            N->data_pointers[0] = N_prime->data_pointers[N_prime->n - 1];
+            N->values[0] = N_prime->values[N_prime->n - 1];
             N->n++;
 
-            // update key in parent
+            // Обновляем ключ в родителе
             parent->keys[N_index - 1] = N->keys[0];
             N_prime->n--;
         }
     }
-    // else N_prime is right to N
+    // инчае N_prime стоит справа от N
     else
     {
         if (!N->leaf)
         {
-            // move first child of N_prime to be last in N
+            // перемещаем первого потомка N_prime на последнее место в N
             N->keys[N->n] = K_prime;
             N->children[N->n + 1] = N_prime->children[0];
             N->n++;
 
-            // update key in parent
+            // обновить ключ в родителе
             parent->keys[N_index] = N_prime->keys[0];
 
-            // Shift keys and children in N_prime
+            // переместить ключи и потомков в N_prime
             for (int i = 0; i < N_prime->n - 1; i++)
             {
                 N_prime->keys[i] = N_prime->keys[i + 1];
@@ -603,46 +758,68 @@ void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N
         }
         else
         {
-            // For leaf nodes
-            // Move the first key of N_prime to be the last key of N
+            // ДЛя листов
+            // перемещаем первый ключ N_prime на последнее место в N
             N->keys[N->n] = N_prime->keys[0];
-            N->data_pointers[N->n] = N_prime->data_pointers[0];
+            N->values[N->n] = N_prime->values[0];
             N->n++;
 
-            // Update parent's key
+            // обновить ключ в родителе
             parent->keys[N_index] = N_prime->keys[1];
 
-            // Shift keys and data pointers in N_prime
+            // перемещаем ключи и указатели
             for (int i = 0; i < N_prime->n - 1; i++)
             {
                 N_prime->keys[i] = N_prime->keys[i + 1];
-                N_prime->data_pointers[i] = N_prime->data_pointers[i + 1];
+                N_prime->values[i] = N_prime->values[i + 1];
             }
             N_prime->n--;
         }
     }
+    // Сохраняем изменения на диск
+    if (tree->disk_tree)
+    {
+        save_node_to_disk(tree->disk_tree, N_prime);
+        save_node_to_disk(tree->disk_tree, N);
+        save_node_to_disk(tree->disk_tree, parent);
+    }
+
+    // Принудительная синхронизация
+    msync(tree->disk_tree->mmap_ptr, tree->disk_tree->mmap_size, MS_SYNC);
 }
 
 void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
 {
-    // remove key and pointers from the node
-    remove_key_and_pointer(N, delete_key);
+    //  Удаляем ключ и указатель из узла
+    remove_key_and_pointer(tree, N, delete_key);
 
-    // if (N is the root and N has only one remaining child)
-    // then make the child of N the new root of the tree and delete N
+    // Если Nкорень и имеет только одного потомка
+    // то пусть его потомок будет новым деревом а  N удалить
     if (N == tree->root && N->n == 0 && !N->leaf)
     {
         // в общем n = 0 и 1 ребенок это норм потому что кол-во детей = n + 1
         // но 1 ребенок может бть только у корня если что
         Node *new_root = N->children[0];
+        // Освобождаем ресурсы старого корня
+        if (tree->disk_tree && N->disk_block != -1)
+        {
+            free_block(tree->disk_tree, N->disk_block);
+        }
         free(N->keys);
         free(N->children);
         free(N);
+
         tree->root = new_root;
+        // Обновляем корень на диске
+        if (tree->disk_tree)
+        {
+            tree->disk_tree->header->root_block = new_root->disk_block;
+            msync(tree->disk_tree->header, BLOCK_SIZE, MS_SYNC);
+        }
         return;
     }
 
-    // if after deletion node has too few keys/pointers
+    // Если после удаления у листа N останется слишком мало ключей или указателей
     if (!N->leaf && N->n < tree->t - 1)
     {
         Node *parent = find_parent(tree, N);
@@ -651,17 +828,18 @@ void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
         Node *left_sibling = (N_index > 0) ? parent->children[N_index - 1] : NULL;
         Node *right_sibling = (N_index < parent->n) ? parent->children[N_index + 1] : NULL;
 
-        // try borrowing from the left sibling
+        // попробуем заимствовать у левого соседа
         if (left_sibling && left_sibling->n > tree->t - 1)
         {
-            redistribute_nodes(N, left_sibling, parent, parent->keys[N_index - 1], N_index);
+            redistribute_nodes(N, left_sibling, parent, parent->keys[N_index - 1], N_index, tree);
         }
-        // try borrowing from the right sibling
+
+        // попробуем заимствовать у правого соседа
         else if (right_sibling && right_sibling->n > tree->t - 1)
         {
-            redistribute_nodes(N, right_sibling, parent, parent->keys[N_index], N_index);
+            redistribute_nodes(N, right_sibling, parent, parent->keys[N_index], N_index, tree);
         }
-        // if cant borrow merge
+        // если не можем заимствовать будем сливать
         else
         {
             if (left_sibling)
@@ -674,7 +852,7 @@ void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
             }
         }
     }
-    // now if N doesnt have too few keys/pointers
+    // если у N достаточно ключей
     else if (N->leaf && N->n < tree->t - 1)
     {
         Node *parent = find_parent(tree, N);
@@ -682,21 +860,21 @@ void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
         {
             int N_index = find_child_index(parent, N);
 
-            // Find left and right siblings
+            // Найти соседей
             Node *left_sibling = (N_index > 0) ? parent->children[N_index - 1] : NULL;
             Node *right_sibling = (N_index < parent->n) ? parent->children[N_index + 1] : NULL;
 
-            // Try to borrow from left sibling
+            // попробуем заимствовать у левого соседа
             if (left_sibling && left_sibling->n > tree->t - 1)
             {
-                redistribute_nodes(N, left_sibling, parent, parent->keys[N_index - 1], N_index);
+                redistribute_nodes(N, left_sibling, parent, parent->keys[N_index - 1], N_index, tree);
             }
-            // Try to borrow from right sibling
+            // попробуем заимствовать у правого соседа
             else if (right_sibling && right_sibling->n > tree->t - 1)
             {
-                redistribute_nodes(N, right_sibling, parent, parent->keys[N_index], N_index);
+                redistribute_nodes(N, right_sibling, parent, parent->keys[N_index], N_index, tree);
             }
-            // If can't borrow, merge with a sibling
+            // если не можем заимствовать будем сливать
             else
             {
                 if (left_sibling)
@@ -712,15 +890,18 @@ void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
     }
 }
 
-void delete(int delete_key, void *delete_pointer, BTree *tree)
+void delete(int delete_key, BTree *tree)
 {
     Node *leaf = find_leaf(delete_key, tree);
+    // Находим указатель для удаления
+    void *delete_pointer = NULL;
+    for (int i = 0; i < leaf->n; i++)
+    {
+        if (leaf->keys[i] == delete_key)
+        {
+            delete_pointer = leaf->values[i];
+            break;
+        }
+    }
     delete_entry(leaf, delete_key, delete_pointer, tree);
-}
-
-int main()
-{
-    BTree *tre = create_tree(3);
-    insert(tre, 10, 20);
-    return 0;
 }
