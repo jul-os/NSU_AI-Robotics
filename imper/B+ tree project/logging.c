@@ -7,7 +7,8 @@
 #include <stdarg.h>
 #include "disk.h"
 #include "tree.h"
-
+#include <string.h>
+#include <unistd.h> 
 
 void wal_log(int log_fd, const char *format, ...)
 {

@@ -561,7 +561,7 @@ void insert(BTree *tree, int insert_key, int value)
 int find_child_index(Node *parent, Node *child)
 {
     int index = 0;
-    while (index <= parent->n && parent->children[index != child]) // fixme comparison between pointer and integer
+    while (index <= parent->n && parent->children[index] != child) 
     {
         index++;
     }
@@ -667,7 +667,7 @@ void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tr
         save_node_to_disk(tree->disk_tree, N_prime);
         save_node_to_disk(tree->disk_tree, parent);
     }
-    delete_entry(parent, K_prime, N, tree);
+    delete_entry(parent, K_prime, tree);
     // Освобождаем память и дисковые ресурсы
     if (tree->disk_tree && N->disk_block != -1)
     {
@@ -788,10 +788,10 @@ void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N
     msync(tree->disk_tree->mmap_ptr, tree->disk_tree->mmap_size, MS_SYNC);
 }
 
-void delete_entry(Node *N, int delete_key, void *delete_pointer, BTree *tree)
+void delete_entry(Node *N, int delete_key, BTree *tree)
 {
-    //  Удаляем ключ и указатель из узла
-    remove_key_and_pointer(tree, N, delete_key);
+    //  Удаляем ключ и значение из узла
+    remove_key_and_value(tree, N, delete_key);
 
     // Если Nкорень и имеет только одного потомка
     // то пусть его потомок будет новым деревом а  N удалить
@@ -894,7 +894,7 @@ void delete(int delete_key, BTree *tree)
 {
     Node *leaf = find_leaf(delete_key, tree);
     // Находим указатель для удаления
-    void *delete_pointer = NULL;
+    int delete_pointer = 0;
     for (int i = 0; i < leaf->n; i++)
     {
         if (leaf->keys[i] == delete_key)
@@ -903,7 +903,7 @@ void delete(int delete_key, BTree *tree)
             break;
         }
     }
-    delete_entry(leaf, delete_key, delete_pointer, tree);
+    delete_entry(leaf, delete_key, tree);
 }
 
 void free_node(Node *node)

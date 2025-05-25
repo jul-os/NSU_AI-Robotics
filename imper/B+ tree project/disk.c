@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <bits/mman-shared.h>
 #include <assert.h>
+#include <string.h>
 
 DiskBTree *init_disk(int fd, int t)
 {
@@ -203,7 +204,7 @@ void save_node_to_disk(DiskBTree *dbt, Node *node)
         // Копируем значения
         for (int i = 0; i < node->n; i++)
         {
-            disk_node->values[i] = *((int32_t *)node->values[i]);
+            disk_node->values[i] = node->values[i];
         }
 
         // Связи между листьями

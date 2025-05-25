@@ -6,6 +6,9 @@
 #define INITIAL_TREE_SIZE (BLOCK_SIZE * 256) // 1MB
 #define T_MAX 32                             // Максимальный порядок дерева
 
+typedef struct BTree BTree;
+typedef struct Node Node;
+
 #pragma pack(push, 1)
 // Структура описания заголовка файла дерева
 typedef struct DiskBTreeHeader

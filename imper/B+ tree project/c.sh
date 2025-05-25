@@ -1,1 +1,1 @@
-gcc main.c tree.c disk.c -o BTREE
+gcc main.c tree.c disk.c logging.c -o BTREE

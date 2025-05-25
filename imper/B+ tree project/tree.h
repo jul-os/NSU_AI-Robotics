@@ -1,6 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef struct DiskBTree DiskBTree;
 
@@ -51,7 +52,7 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime);
 // Удаление - вспомогательная функция\функция-вызов
 void delete(int delete_key, BTree *tree);
 // Удаление
-void delete_entry(Node *N, int K, void *P, BTree *tree);
+void delete_entry(Node *N, int delete_key,  BTree *tree);
 // Удаление ключа и указателя из узла
 void remove_key_and_value(BTree* tree, Node *N, int delete_key);
 

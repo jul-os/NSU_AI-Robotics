@@ -7,14 +7,14 @@
 #include "disk.h"
 #include <sys/mman.h>
 #include <sys/stat.h>
-
+#include <string.h>
 int main()
 {
     // Открываем файлы
     FILE *input, *output;
     input = fopen("input.txt", "r");
     output = fopen("output.txt", "w");
-
+    fprintf(output, "1\n");
     // Читаем минимальную степень дерева
     int t;
     if (scanf("%d", &t) != 1)
@@ -22,7 +22,7 @@ int main()
         fprintf(stderr, "Failed to read tree order\n");
         return 1;
     }
-
+fprintf(output, "1\n");
     // читаем названия файлов данных и логов
     char data_file_name[256];
     char log_file_name[256];
@@ -32,7 +32,7 @@ int main()
         fprintf(stderr, "Couldn't read file names\n");
         return 1;
     }
-
+fprintf(output, "1\n");
     // так как далее будет использоваться убеждение, что файл новый, и это не противоречит требованиям проекта,
     // то перед началом работы с файлом я его очищаю от того, что могло накопиться во время других тестов
 
@@ -48,7 +48,7 @@ int main()
         fclose(output);
         return EXIT_FAILURE;
     }
-
+fprintf(output, "1\n");
     int log_fd = open(log_file_name, O_RDWR | O_CREAT, 0644);
     if (log_fd == -1)
     {
@@ -57,7 +57,7 @@ int main()
         fclose(output);
         return EXIT_FAILURE;
     }
-
+fprintf(output, "1\n");
     // Инициализируем структуры
     DiskBTree *dbt = init_disk(tree_fd, t);
     if (!dbt)
@@ -69,7 +69,7 @@ int main()
     }
     BTree *btree = create_tree(t);
     connect_tree_to_disk(btree, dbt);
-
+fprintf(output, "1\n");
     struct stat st;
     // Проверяем размер. если файл логов не пуст, значит нам нужно восстанавливать из него
     // Иначе мы в него только записываем
@@ -83,17 +83,13 @@ int main()
         // Инициализируем новый лог
         wal_log(log_fd, "t = %d\n", t);
     }
-
-    // тк гарантировали что файл новый, инициализируем заголовок
-
-    init_empty_tree(data_file_name, t);
-    // запись в сам файл то есть mmap будет происходить в файле disk.c тоже
-
+    fprintf(output, "1\n");
     // Основной цикл обработки команд
     char command[16];
     int key, value, min_key, max_key;
     while (fscanf(input, "%15s", command) == 1)
     {
+        fprintf(output, "uuu\n");
         if (strcmp(command, "INSERT") == 0)
         {
             if (fscanf(input, "%d %d", &key, &value) == 2)
@@ -144,7 +140,7 @@ int main()
     fclose(output);
     fclose(input);
     free_tree(btree);
-    free_disk(dbt);   // TODO
+    free_disk(dbt); 
 
     return 0;
 }
