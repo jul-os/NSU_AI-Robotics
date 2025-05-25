@@ -15,7 +15,7 @@ int tree_fd = -1;
 
 Node *create_node(int t, bool is_leaf)
 {
-    //Создаем новый узел
+    // Создаем новый узел
     Node *new_node = (Node *)malloc(sizeof(Node));
     if (!new_node)
     {
@@ -23,7 +23,7 @@ Node *create_node(int t, bool is_leaf)
         ;
         return NULL;
     }
-    //Инициализируем ключи
+    // Инициализируем ключи
     new_node->keys = (int *)malloc((2 * t - 1) * sizeof(int));
     if (!new_node->keys)
     {
@@ -31,7 +31,7 @@ Node *create_node(int t, bool is_leaf)
         free(new_node);
         return NULL;
     }
-    //Присваиваем значения прочим
+    // Присваиваем значения прочим
     new_node->n = 0;
     new_node->leaf = is_leaf;
     new_node->disk_block = -1;
@@ -73,7 +73,7 @@ Node *create_node(int t, bool is_leaf)
 
 BTree *create_tree(int t)
 {
-    //Создаем дерево и заполняем его
+    // Создаем дерево и заполняем его
     BTree *tree = (BTree *)malloc(sizeof(BTree));
     tree->root = create_node(t, true);
     tree->t = t;
@@ -89,6 +89,7 @@ BTree *create_tree(int t)
 
 void *find(int search_key, BTree *tree)
 {
+    // Начинаем с корня, ищем нужный N
     Node *N = tree->root;
     while (!N->leaf)
     {
@@ -110,7 +111,7 @@ void *find(int search_key, BTree *tree)
             N = N->children[i]; // val < N->keys[i]
         }
     }
-    // now N is a leaf
+    //Теперь N это лист, ищем в нем ключ
     for (int i = 0; i < N->n; i++)
     {
         if (N->keys[i] == search_key)
@@ -124,7 +125,7 @@ void *find(int search_key, BTree *tree)
 
 Node *find_leaf(int search_key, BTree *tree)
 {
-    // Начинаем с корня
+    // Начинаем с корня, ищем нужный N
     Node *N = tree->root;
     while (!N->leaf)
     {
@@ -190,7 +191,6 @@ Node *find_parent(BTree *tree, Node *child)
     return (current == child) ? parent : NULL;
 }
 
-
 void range_query(BTree *tree, int min_k, int max_k)
 {
     if (!tree || !tree->root)
@@ -227,20 +227,20 @@ void range_query(BTree *tree, int min_k, int max_k)
 
 void insert_into_leaf(Node *L, int insert_key, void *insert_pointer)
 {
-    // find where to insert
+    // Найти место для вставки
     int insert_pos = 0;
     while (insert_pos < L->n && insert_key > L->keys[insert_pos])
     {
         insert_pos++;
     }
-    // move other elements to the right
+    // переставить остальные элементы вправо
     // пояснение: мы в insert уже проверили что лист не будет переполнен
     for (int i = L->n; i > insert_pos; i--)
     {
         L->keys[i] = L->keys[i - 1];
         L->data_pointers[i] = L->data_pointers[i - 1];
     }
-    // insert the new key and pointer
+    // вставить новый ключ и указатель
     L->keys[insert_pos] = insert_key;
     L->data_pointers[insert_pos] = insert_pointer;
     L->n++;
@@ -522,13 +522,12 @@ void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tr
     free(N);
 }
 
-
 void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index)
 {
     // Если N_prime стоит слева от N
     if (N_index > 0 && parent->children[N_index - 1] == N_prime)
     {
-        //Если N не лист
+        // Если N не лист
         if (!N->leaf)
         {
             // Переместить последнего потомка N_prime, чтобы он был первым потомком N

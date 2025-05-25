@@ -59,5 +59,5 @@ int32_t allocate_block(DiskBTree* dbt);
 // Возвращает блок в список свободных
 void free_block(DiskBTree* dbt, int32_t block_num);
 
-// Инициализирует список свободных блоков при создании файла
+// Инициализирует список свободных блоков связывая их в односвязный список
 void init_free_blocks(DiskBTree* dbt, int32_t start_block, int32_t count);
