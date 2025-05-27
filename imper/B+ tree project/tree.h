@@ -2,17 +2,20 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <bits/pthreadtypes.h>
 
 typedef struct DiskBTree DiskBTree;
 
 // Структура узла B+ дерева
 typedef struct Node
 {
+    pthread_rwlock_t lock;
     int *keys;              // Ключи
     struct Node **children; // Для внутренних узлов: казатели на потомков
     int n;                  // Текущее количество ключей
     bool leaf;              // Флаг листа
-    int *values;  // ДЛя листов: значения
+    int *values;            // ДЛя листов: значения
     struct Node *prev;      // ДЛя листов: указатель на соседние листы
     struct Node *next;
     int32_t disk_block; // Связанный с этим листом блок на дисково пространстве
@@ -21,13 +24,14 @@ typedef struct Node
 // Структура B+ дерева
 typedef struct BTree
 {
+    pthread_rwlock_t lock;
     int t;                // Порядок дерева (min degree)
     Node *root;           // Корень
     DiskBTree *disk_tree; // Ссылка на дисковое представление
 } BTree;
 
 // Создать узел
-Node *create_node(int t, bool is_leaf, BTree* tree);
+Node *create_node(int t, bool is_leaf, BTree *tree);
 // Создать дерево
 BTree *create_tree(int t);
 
@@ -43,7 +47,7 @@ int find_child_index(Node *parent, Node *child);
 void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output);
 
 // Вставка в дерево
-void insert(BTree *tree, int insert_key,int value);
+void insert(BTree *tree, int insert_key, int value);
 // Вставка в лист
 void insert_into_leaf(BTree *tree, Node *L, int insert_key, int value);
 // Обновление родителя
@@ -52,20 +56,20 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime);
 // Удаление - вспомогательная функция\функция-вызов
 void delete(int delete_key, BTree *tree);
 // Удаление
-void delete_entry(Node *N, int delete_key,  BTree *tree);
+void delete_entry(Node *N, int delete_key, BTree *tree);
 // Удаление ключа и указателя из узла
-void remove_key_and_value(BTree* tree, Node *N, int delete_key);
+void remove_key_and_value(BTree *tree, Node *N, int delete_key);
 
 // Объединить два узла
 void coalesce_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, BTree *tree);
 // Перераспределение узлов при заимствовании
-void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index, BTree* tree);
+void redistribute_nodes(Node *N, Node *N_prime, Node *parent, int K_prime, int N_index, BTree *tree);
 
-//Освобождение узла
+// Освобождение узла
 void free_node(Node *node);
 // Рекурсивная функция для освобождения всех узлов
 void free_subtree(Node *node);
-// Освобождение всего B+ дерева 
+// Освобождение всего B+ дерева
 void free_tree(BTree *tree);
 
-Node* find_leaf_to_insert(BTree *tree, int key) ;
+Node *find_leaf_to_insert(Node* root, int key);

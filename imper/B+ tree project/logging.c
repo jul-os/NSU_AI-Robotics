@@ -2,16 +2,20 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <bits/mman-shared.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include "disk.h"
 #include "tree.h"
 #include <string.h>
-#include <unistd.h> 
+#include <unistd.h>
+
+#include <pthread.h>
+
+ static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void wal_log(int log_fd, const char *format, ...)
 {
+    pthread_mutex_lock(&log_mutex); // захват мьютекса
     va_list args;
     va_start(args, format);
 
@@ -21,6 +25,7 @@ void wal_log(int log_fd, const char *format, ...)
     {
         perror("Failed to format log message");
         va_end(args);
+        pthread_mutex_unlock(&log_mutex);
         return;
     }
 
@@ -28,6 +33,7 @@ void wal_log(int log_fd, const char *format, ...)
     if (write(log_fd, buffer, len) != len)
     {
         perror("Failed to write to log file");
+        pthread_mutex_unlock(&log_mutex);
         va_end(args);
         return;
     }
@@ -39,6 +45,7 @@ void wal_log(int log_fd, const char *format, ...)
     }
 
     va_end(args);
+    pthread_mutex_unlock(&log_mutex);
 }
 
 // Восстановление состояния из лога
@@ -56,6 +63,7 @@ void recover_from_log(int log_fd, DiskBTree *dbt, BTree *btree)
         fclose(log_file);
         return;
     }
+    // ранее в 
 
     // Обрабатываем команды из лога
     while (fscanf(log_file, "%15s", command) == 1)
