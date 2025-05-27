@@ -10,75 +10,6 @@
 #include <sys/stat.h>
 #include <string.h>
 
-void print_node(Node *node, int level)
-{
-    if (!node)
-    {
-        printf("%*sNULL\n", level * 4, "");
-        return;
-    }
-
-    // Выводим отступ в зависимости от уровня
-    printf("%*sLevel %d %s | n=%d | Keys: ", level * 4, "", level, (node->leaf ? "Leaf" : "Internal"), node->n);
-
-    // Вывод ключей
-    for (int i = 0; i < node->n; i++)
-    {
-        printf("%d ", node->keys[i]);
-    }
-    printf("\n");
-
-    if (node->leaf)
-    {
-        // Для листа выводим значения
-        printf("%*sValues: ", level * 4, "");
-        for (int i = 0; i < node->n; i++)
-        {
-            printf("%d ", node->values[i]);
-        }
-        printf("\n");
-
-        // Вывод соседних листов (prev, next) по ключам (если есть)
-        if (node->prev)
-        {
-            printf("%*sPrev leaf keys: ", level * 4, "");
-            for (int i = 0; i < node->prev->n; i++)
-            {
-                printf("%d ", node->prev->keys[i]);
-            }
-            printf("\n");
-        }
-        if (node->next)
-        {
-            printf("%*sNext leaf keys: ", level * 4, "");
-            for (int i = 0; i < node->next->n; i++)
-            {
-                printf("%d ", node->next->keys[i]);
-            }
-            printf("\n");
-        }
-    }
-    else
-    {
-        // Для внутренних узлов рекурсивно выводим детей
-        for (int i = 0; i <= node->n; i++)
-        {
-            print_node(node->children[i], level + 1);
-        }
-    }
-}
-
-void print_btree(BTree *tree)
-{
-    if (!tree)
-    {
-        printf("Tree is NULL\n");
-        return;
-    }
-    printf("B+ Tree (order = %d):\n", tree->t);
-    print_node(tree->root, 0);
-}
-
 int main()
 {
     // Открываем файлы
@@ -213,20 +144,6 @@ int main()
     // для демонстрации работы с потоками
     run_concurrent_test(btree, num_threads);
     print_btree(btree);
-
-    // потоков может быть минимум 1 поэтому что-то с ключом 10 обязательно будет
-    int search_result;
-    for (int i = 1; i <= 4; i++)
-    {
-        if (find(dbt, (i + 9), btree, &search_result))
-        {
-            fprintf(output, "FOR KEY %d FIND FOUND %d\n", (i + 9), search_result);
-        }
-        else
-        {
-            fprintf(output, "FIND FOR KEY %d NOT FOUND\n", (i + 9));
-        }
-    }
 
     // Перед завершением синхронизируем все изменения
     fsync(tree_fd);

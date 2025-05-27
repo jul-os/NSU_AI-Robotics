@@ -63,6 +63,11 @@ DiskBTree *init_disk(int fd, int t)
 
 void connect_tree_to_disk(BTree* tree, DiskBTree* dbt) {
     tree->disk_tree = dbt;
+    tree->root=create_node(tree->t, true, tree, true, NULL);
+    if (!tree->root){
+        fprintf(stderr, "failed to create rooot node");
+        return;
+    }
     tree->root->disk_block = allocate_block(dbt);
     dbt->header->root_block = tree->root->disk_block;
     save_node_to_disk(dbt, tree->root);

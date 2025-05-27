@@ -13,7 +13,7 @@ void *tree_memory = NULL;
 size_t tree_memory_size = 0;
 int tree_fd = -1;
 
-Node *create_node(int t, bool is_leaf, BTree *tree)
+Node *create_node(int t, bool is_leaf, BTree *tree, bool tree_or, DiskBTree *disk)
 {
     // Создаем новый узел
     Node *new_node = (Node *)malloc(sizeof(Node));
@@ -70,8 +70,34 @@ Node *create_node(int t, bool is_leaf, BTree *tree)
         new_node->prev = NULL;
         new_node->next = NULL;
     }
+    if (tree_or && disk)
+    {
+
+        new_node->disk_block = allocate_block(disk);
+        if (new_node->disk_block == -1)
+        {
+            fprintf(stderr, "Failed to allocate disk block for new node\n");
+            // Освобождаем уже выделенную память
+            if (is_leaf)
+            {
+                free(new_node->values);
+            }
+            else
+            {
+                free(new_node->children);
+            }
+            free(new_node->keys);
+            free(new_node);
+            return NULL;
+        }
+
+        // Сохраняем пустой узел на диск
+        save_node_to_disk(disk, new_node);
+
+        return new_node;
+    }
     // Если дерево связано с диском, сразу выделяем блок
-    if (tree->disk_tree)
+    else if (tree->disk_tree)
     {
         new_node->disk_block = allocate_block(tree->disk_tree);
         if (new_node->disk_block == -1)
@@ -93,15 +119,17 @@ Node *create_node(int t, bool is_leaf, BTree *tree)
 
         // Сохраняем пустой узел на диск
         save_node_to_disk(tree->disk_tree, new_node);
+
+        return new_node;
     }
-    return new_node;
 }
 
 BTree *create_tree(int t)
 {
     // Создаем дерево и заполняем его
     BTree *tree = (BTree *)malloc(sizeof(BTree));
-    tree->root = create_node(t, true, tree);
+    /// tree->root = create_node(t, true, tree, false, NULL);
+    tree->root = NULL;
     pthread_rwlock_init(&tree->lock, NULL);
     tree->t = t;
     tree->disk_tree = NULL;
@@ -117,28 +145,18 @@ bool find(DiskBTree *dbt, int search_key, BTree *tree, int *out_value)
     while (!N->leaf)
     {
         int i = 0;
-        while (i < N->n && search_key <= N->keys[i])
+        while (i < N->n && search_key >= N->keys[i])
         {
             i++;
         }
-        Node *next;
-        if (i == N->n)
-        {
-            next = N->children[N->n];
-        }
-        else if (search_key == N->keys[i])
-        {
-            next = N->children[i + 1];
-        }
-        else
-        {
-            next = N->children[i]; // val < N->keys[i]
-        }
 
-        pthread_rwlock_rdlock(&next->lock); // блокируем ребёнка
-        pthread_rwlock_unlock(&N->lock);    // отпускаем родителя
+        Node *next = N->children[i];
+
+        pthread_rwlock_rdlock(&next->lock);
+        pthread_rwlock_unlock(&N->lock);
         N = next;
     }
+
     // Теперь N это лист, и он заблокирован, ищем в нем ключ
     for (int i = 0; i < N->n; i++)
     {
@@ -162,38 +180,19 @@ Node *find_leaf(int search_key, BTree *tree)
     while (!N->leaf)
     {
         int i = 0;
-        while (i < N->n && search_key <= N->keys[i])
+        while (i < N->n && search_key >= N->keys[i])
         {
             i++;
         }
-        Node *next;
-        if (i == N->n)
-        {
-            next = N->children[N->n];
-        }
-        else if (search_key == N->keys[i])
-        {
-            next = N->children[i + 1];
-        }
-        else
-        {
-            next = N->children[i]; // val < N->keys[i]
-        }
+        Node *next = N->children[i];
 
         pthread_rwlock_rdlock(&next->lock); // блокируем ребёнка
         pthread_rwlock_unlock(&N->lock);    // отпускаем родителя
         N = next;
     }
-    // Теперь N это лист, ищем в нем ключ
-    for (int i = 0; i < N->n; i++)
-    {
-        if (N->keys[i] == search_key)
-        {
-            // В этой функции освободить найденный узел должна будет та функция которая вызвала find_leaf !
-            return N;
-        }
-    }
-    return NULL;
+
+    // В этой функции освободить найденный узел должна будет та функция которая вызвала find_leaf !
+    return N;
 }
 void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output)
 {
@@ -267,27 +266,16 @@ Node *find_parent(BTree *tree, Node *child)
     {
         parent = current;
         int i = 0;
-        while (i < current->n && current->keys[0] <= current->keys[i])
+        while (i < current->n && child->keys[0] > current->keys[i])
         {
             i++;
         }
-        if (i == current->n)
-        {
-            current = current->children[current->n];
-        }
-        else if (current->keys[0] == current->keys[i])
-        {
-            current = current->children[i + 1];
-        }
-        else
-        {
-            current = current->children[i]; // val < N->keys[i]
-        }
+        current = current->children[i];
     }
     return (current == child) ? parent : NULL;
 }
 
-void insert_into_leaf(BTree *tree, Node *L, int insert_key, int value)
+void insert_into_leaf(DiskBTree *disk, Node *L, int insert_key, int value)
 {
     // Найти место для вставки
     int insert_pos = 0;
@@ -307,9 +295,9 @@ void insert_into_leaf(BTree *tree, Node *L, int insert_key, int value)
     L->values[insert_pos] = value;
     L->n++;
     // оказалось что вообще-то указатель из родителя в лист не обязан указывать на первый элемент листа поэтому все в этой функции
-    if (tree->disk_tree)
+    if (disk)
     {
-        save_node_to_disk(tree->disk_tree, L);
+        save_node_to_disk(disk, L);
     }
 }
 
@@ -317,13 +305,11 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
 {
     pthread_rwlock_wrlock(&N->lock);
     pthread_rwlock_wrlock(&N_prime->lock);
-    // НА слуйчай если придется создавать новый корень блокируем дерево
-    pthread_rwlock_wrlock(&tree->lock);
+
     // Случай 1: N - корень, создаем новый корень
     if (tree->root == N)
     {
-        Node *new_root = create_node(tree->t, false, tree);
-        pthread_rwlock_wrlock(&new_root->lock);
+        Node *new_root = create_node(tree->t, false, tree, true, tree->disk_tree);
         if (!new_root)
         {
             pthread_rwlock_unlock(&tree->lock);
@@ -333,6 +319,8 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
             perror("Failed to create new root node\n");
             return;
         }
+
+        pthread_rwlock_wrlock(&new_root->lock);
         new_root->keys[0] = K_prime;
         new_root->children[0] = N;
         new_root->children[1] = N_prime;
@@ -355,7 +343,6 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         pthread_rwlock_unlock(&N_prime->lock);
         return;
     }
-    pthread_rwlock_unlock(&tree->lock);
     // Случай 2:
     // Находим родителя
     Node *parent = find_parent(tree, N);
@@ -377,13 +364,13 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         }
         insert_pos++; // Вставляем после N
                       // Сдвигаем элементы вправо
+        for (int i = parent->n - 1; i >= insert_pos - 1; i--)
+        {
+            parent->keys[i + 1] = parent->keys[i];
+        }
         for (int i = parent->n; i >= insert_pos; i--)
         {
-            parent->keys[i] = parent->keys[i - 1];
-        }
-        for (int i = parent->n + 1; i > insert_pos; i--)
-        {
-            parent->children[i] = parent->children[i - 1];
+            parent->children[i + 1] = parent->children[i];
         }
         // Вставляем K_prime и N_prime
         parent->keys[insert_pos - 1] = K_prime;
@@ -394,6 +381,10 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         {
             save_node_to_disk(tree->disk_tree, parent);
         }
+        pthread_rwlock_unlock(&N->lock);
+        pthread_rwlock_unlock(&N_prime->lock);
+        pthread_rwlock_unlock(&parent->lock);
+        return;
     }
     // Родитель заполнен, нужно разделить
     else
@@ -446,19 +437,18 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         int split_pos = total_keys / 2;
         int split_pos_node = temp_keys[split_pos];
 
-        Node *P_prime = create_node(tree->t, false, tree);
-        pthread_rwlock_wrlock(&P_prime->lock);
+        Node *P_prime = create_node(tree->t, false, tree, true, tree->disk_tree);
         if (!P_prime)
         {
             perror("Error: Failed to create new node\n");
             pthread_rwlock_unlock(&parent->lock);
-            pthread_rwlock_unlock(&P_prime->lock);
             pthread_rwlock_unlock(&N->lock);
             pthread_rwlock_unlock(&N_prime->lock);
             free(temp_keys);
             free(temp_pointers);
             return;
         }
+        pthread_rwlock_wrlock(&P_prime->lock);
         // Обновляем исходного родителя
         parent->n = 0;
         for (i = 0; i < split_pos; i++)
@@ -489,12 +479,13 @@ void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime)
         pthread_rwlock_unlock(&N->lock);
         pthread_rwlock_unlock(&N_prime->lock);
         pthread_rwlock_unlock(&parent->lock);
+        pthread_rwlock_unlock(&P_prime->lock);
         //  Рекурсивно вставляем split_pos_node в родителя
         insert_into_parent(tree, parent, split_pos_node, P_prime);
     }
 }
 
-Node *find_leaf_to_insert(Node* root, int key)
+Node *find_leaf_to_insert(Node *root, int key)
 {
     if (root == NULL)
         return NULL;
@@ -516,21 +507,26 @@ Node *find_leaf_to_insert(Node* root, int key)
         current = child;
     }
     // это лист и мы его отпускаем для чтения но блокируем для записи
-    
+
     pthread_rwlock_unlock(&current->lock);
-    pthread_rwlock_wrlock(&current->lock);
     return current;
 }
 
 void insert(BTree *tree, int insert_key, int value)
 {
+    fprintf(stdout, "entered\n");
     // глобальная блокировка дерева чтобы не было гонок при создании корня
     pthread_rwlock_wrlock(&tree->lock);
+
+    fprintf(stdout, "got write lock\n");
     // Если дерево пустое
     if (tree->root == NULL || tree->root->n == 0)
     // Вставляем узел L который также является корнем
     {
-        Node *L = create_node(tree->t, true, tree);
+        fprintf(stdout, "entered for =%d value=%d\n", insert_key, value);
+        Node *L = create_node(tree->t, true, tree, true, tree->disk_tree);
+
+        fprintf(stdout, "left for =%d value=%d\n", insert_key, value);
         if (!L)
         {
             perror("Error: Failed to create root leaf node\n");
@@ -555,27 +551,32 @@ void insert(BTree *tree, int insert_key, int value)
         fprintf(stdout, "1  Inserted key=%d value=%d\n", insert_key, value);
         return;
     }
-    Node * root = tree->root;
-    pthread_rwlock_unlock(&tree->lock);
+    Node *root = tree->root;
     // если корень у дерева уже есть: найти лист, в который нужно вставить
-    Node *L = find_leaf_to_insert(root, insert_key); // приходит лист уже заблокированный на запись
-    
+
+    Node *L = find_leaf_to_insert(root, insert_key);
+
     if (!L)
     {
         perror("Error: Failed to find leaf node\n");
         return;
     }
+    pthread_rwlock_wrlock(&L->lock);
     //  Если в узле еще есть место для вставки, вставляем туда
     if (L->n < 2 * tree->t - 1)
     {
-        insert_into_leaf(tree, L, insert_key, value); // сюда подается заблокированный, там просто заполняется, после снимаем блокировку
+
+        fprintf(stdout, "rwrwerwerwe for =%d value=%d\n", insert_key, value);
+        insert_into_leaf(tree->disk_tree, L, insert_key, value); // сюда подается заблокированный, там просто заполняется, после снимаем блокировку
         pthread_rwlock_unlock(&L->lock);
         fprintf(stdout, "2   Inserted key=%d value=%d\n", insert_key, value);
     }
     else
     {
         // Иначе разбиваем лист
-        Node *L_prime = create_node(tree->t, true, tree);
+        fprintf(stdout, "entered for =%d value=%d\n", insert_key, value);
+        Node *L_prime = create_node(tree->t, true, tree, true, tree->disk_tree);
+        fprintf(stdout, "left for =%d value=%d\n", insert_key, value);
         if (!L_prime)
         {
             perror("Error: Failed to create L_prime node\n");
@@ -619,8 +620,8 @@ void insert(BTree *tree, int insert_key, int value)
         }
         // Ищем точку разделения
         int split_pos = total_keys / 2;
-        int K_prime = temp_keys[split_pos];
-        // Обновляем L и L_prime
+        // int K_prime = temp_keys[split_pos];
+        //  Обновляем L и L_prime
         L->n = split_pos;
         for (i = 0; i < split_pos; i++)
         {
@@ -650,6 +651,10 @@ void insert(BTree *tree, int insert_key, int value)
         L_prime->prev = L;
         free(temp_keys);
         free(temp_values);
+
+        // Ключ для подъёма в родителя — первый ключ нового листа
+        int K_prime = L_prime->keys[0];
+
         // Сохраняем изменения на диск перед обновлением родителя
         if (tree->disk_tree)
         {
@@ -661,9 +666,9 @@ void insert(BTree *tree, int insert_key, int value)
         pthread_rwlock_unlock(&L_prime->lock);
         insert_into_parent(tree, L, K_prime, L_prime); // принимает разблокированные узлы чтобы не создать пролбем при рекурсии
 
-        fprintf(stdout, "Inserted key=%d value=%d\n", insert_key, value);
+        pthread_rwlock_unlock(&tree->lock);
+        fprintf(stdout, "insert done for key %d\n", insert_key);
     }
-    
 }
 
 int find_child_index(Node *parent, Node *child)

@@ -31,7 +31,7 @@ typedef struct BTree
 } BTree;
 
 // Создать узел
-Node *create_node(int t, bool is_leaf, BTree *tree);
+Node *create_node(int t, bool is_leaf, BTree *tree, bool tree_or, DiskBTree *disk);
 // Создать дерево
 BTree *create_tree(int t);
 
@@ -49,7 +49,7 @@ void range_query(BTree *tree, int min_k, int max_k, DiskBTree *dbt, FILE *output
 // Вставка в дерево
 void insert(BTree *tree, int insert_key, int value);
 // Вставка в лист
-void insert_into_leaf(BTree *tree, Node *L, int insert_key, int value);
+void insert_into_leaf(DiskBTree * disk, Node *L, int insert_key, int value);
 // Обновление родителя
 void insert_into_parent(BTree *tree, Node *N, int K_prime, Node *N_prime);
 
