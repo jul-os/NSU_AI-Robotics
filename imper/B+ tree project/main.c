@@ -143,7 +143,6 @@ int main()
 
     // для демонстрации работы с потоками
     run_concurrent_test(btree, num_threads);
-    print_btree(btree);
 
     // Перед завершением синхронизируем все изменения
     fsync(tree_fd);
