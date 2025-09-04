@@ -1,0 +1,20 @@
+# VS Code specific files
+.vscode/
+
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+build/
+dist/
+
+# Log files
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# Temporary files
+*.tmp
+*.bak
