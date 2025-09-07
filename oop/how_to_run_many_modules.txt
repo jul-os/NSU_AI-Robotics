@@ -1,0 +1,10 @@
+g++ -o prog main.cpp module1.cpp module2.cpp 
+./prog 
+
+or
+
+c++ -o module1.o -c module1.cpp 
+c++ -o module2.o -c module2.cpp 
+c++ -o main.o -c main.cpp 
+c++ -o prog main.o module1.o module2.o
+./prog 
