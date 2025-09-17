@@ -34,18 +34,13 @@ int main(int argc, char **argv)
         while (ss >> word)
         {
             // удалить все знаки препинания
-            word.erase(std::remove_if(word.begin(), word.end(), [](unsigned char c)
-                                      { return std::ispunct(c); }),
+            word.erase(remove_if(word.begin(), word.end(), [](unsigned char c)
+                                 { return ispunct(c); }),
                        word.end());
-            // вставка в map
-            if (wordsCount.find(word) == wordsCount.end())
-            {
-                wordsCount.insert({word, 1});
-            }
-            else
-            {
-                wordsCount[word] += 1;
-            }
+            // вставка в map,
+
+            wordsCount[word]++;
+
             totalWords++;
         }
     }
@@ -55,9 +50,9 @@ int main(int argc, char **argv)
          { return a.second > b.second; });
     // тут запись в csv
     out << "word, count, percentage\n";
-    for (auto word : sortedMap)
+    for (const auto &[word, count] : sortedMap)
     {
-        out << word.first << "," << word.second << "," << word.second / totalWords << "\n";
+        out << word << "," << count << "," << count / totalWords << "\n";
     }
     // очищаем мапу, закрываем файлы
     wordsCount.clear();

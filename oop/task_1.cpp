@@ -6,6 +6,11 @@ int main()
     double a, c, b, D;
     cout << "Put in coefficients in order A, B, C:\n";
     cin >> a >> b >> c;
+    if (cin.fail())
+    {
+        cout << "incorrect input \n";
+        return 0;
+    }
     if (a == 0 && b == 0)
     {
         cout << "it makes no sense\n";
