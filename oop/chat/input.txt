@@ -1,0 +1,5 @@
+user User
+girl Girl
+boy Boy
+cowardGirl CowardGirl
+richBoy RichBoy
