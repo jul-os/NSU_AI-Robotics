@@ -11,9 +11,7 @@ Matrix::~Matrix()
     // еструктор не нужен std::vector сам управляет памятью
 }
 
-Matrix::Matrix(const Matrix &mat)
-    : num_rows(mat.num_rows), num_cols(mat.num_cols),
-      m_data(mat.m_data)
+Matrix::Matrix(const Matrix &mat) : num_rows(mat.num_rows), num_cols(mat.num_cols), m_data(mat.m_data)
 {
     // std::vector имеет встроенный конструктор копирования, который создаёт полную глубокую копию всех данных
 }
@@ -430,16 +428,13 @@ double Matrix::det() const
 
 Matrix Matrix::inverse() const
 {
-    // Проверяем, что матрица квадратная
     if (!isValid() || num_rows != num_cols)
     {
         return Matrix();
     }
-
     // Создаём расширенную матрицу [A|I]
     size_t n = num_rows;
     std::vector<std::vector<double>> augmented(n, std::vector<double>(2 * n, 0.0));
-
     // Заполняем левую часть исходной матрицей A
     for (size_t i = 0; i < n; ++i)
     {
