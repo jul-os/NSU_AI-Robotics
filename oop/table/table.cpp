@@ -108,10 +108,8 @@ string TableFormatter::format(const vector<char> &alignments,
     vector<int> widths = calculateColumnWidths(rows);
     stringstream result;
 
-    // Верхняя граница
     result << createHorizontalLine(widths) << "\n";
 
-    // Строки данных
     for (const auto &row : rows)
     {
         result << formatRow(row, alignments, widths) << "\n";
@@ -126,7 +124,7 @@ vector<int> TableFormatter::calculateColumnWidths(const vector<vector<string>> &
     if (rows.empty())
         return {};
 
-    // Находим максимальное количество столбцов во всех строках
+    // еаходит максимальное количество столбцов во всех строках
     size_t max_columns = 0;
     for (const auto &row : rows)
     {
@@ -143,7 +141,7 @@ vector<int> TableFormatter::calculateColumnWidths(const vector<vector<string>> &
         }
     }
 
-    // Добавляем отступы (по 1 пробелу с каждой стороны)
+    // тступы по 1 пробелу с каждой стороны
     for (auto &width : widths)
     {
         width += 2;
@@ -193,23 +191,23 @@ string TableFormatter::alignCell(const string &content, char alignment, int widt
     switch (alignment)
     {
     case '<':
-    { // Выравнивание по левому краю
+    {
         int rightSpaces = totalSpaces - 1;
         return " " + content + string(rightSpaces, ' ');
     }
     case '=':
-    { // Выравнивание по центру
+    {
         int leftSpaces = totalSpaces / 2;
         int rightSpaces = totalSpaces - leftSpaces;
         return string(leftSpaces, ' ') + content + string(rightSpaces, ' ');
     }
     case '>':
-    { // Выравнивание по правому краю
+    {
         int leftSpaces = totalSpaces - 1;
         return string(leftSpaces, ' ') + content + " ";
     }
     default:
-    { // По умолчанию - как левое
+    {
         int rightSpaces = totalSpaces - 1;
         return " " + content + string(rightSpaces, ' ');
     }
@@ -220,12 +218,8 @@ void TableManager::process(istream &input, ostream &output)
 {
     TableParser parser;
     TableFormatter formatter;
-
-    // Парсим в наши внутренние поля
     auto parsed = parser.parse(input);
     alignments = parsed.alignments;
     rows = parsed.rows;
-
-    // Форматируем
     output << formatter.format(alignments, rows);
 }
