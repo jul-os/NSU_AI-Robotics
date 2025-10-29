@@ -251,7 +251,6 @@ void test_transpose()
 
 void test_determinant()
 {
-    // todo 10*10
     cout << "Testing determinant..." << endl;
 
     // Матрица 1x1
@@ -284,6 +283,16 @@ void test_determinant()
     Matrix d(2, 3);
     assert(std::isnan(d.det()));
 
+    // todo 5*5
+    Matrix big(5, 5);
+    big.setConstants(1);
+    big.coeffRef(0, 0) = 3;
+    big.coeffRef(0, 2) = 12;
+    big.coeffRef(1, 0) = 6;
+    big.coeffRef(3, 4) = 3;
+    big.coeffRef(4, 3) = 9;
+    assert(almost_equal(big.det(), -880.0));
+
     cout << "Determinant test passed!" << endl;
 }
 
@@ -300,7 +309,6 @@ void test_inverse()
 
     Matrix inv = a.inverse();
     assert(inv.isValid());
-    // todo 7*7
 
     // Проверяем, что A * A^(-1) = I
     Matrix identity_check = a * inv;
@@ -315,8 +323,37 @@ void test_inverse()
     singular.coeffRef(0, 1) = 2;
     singular.coeffRef(1, 0) = 2;
     singular.coeffRef(1, 1) = 4;
+
     Matrix inv_singular = singular.inverse();
-    assert(!inv_singular.isValid());
+    assert(!inv_singular.isValid()); // должна выйти невалидной
+
+    // todo 7*7
+    Matrix big(7, 7);
+    big.setConstants(1);
+    big.coeffRef(0, 0) = 3;
+    big.coeffRef(1, 3) = 12;
+    big.coeffRef(1, 6) = 2;
+    big.coeffRef(2, 2) = 5;
+    big.coeffRef(3, 1) = 5;
+    big.coeffRef(4, 4) = 4;
+    big.coeffRef(5, 0) = 6;
+    big.coeffRef(5, 3) = 21;
+    big.coeffRef(6, 2) = 4;
+    big.coeffRef(6, 5) = 7;
+
+    Matrix big_inv = big.inverse();
+    assert(big_inv.isValid());
+
+    Matrix big_identity_check = big * big_inv;
+    big_identity_check.setIdentity();
+
+    assert(almost_equal(big_identity_check.coeffRef(0, 0), 1.0));
+    assert(almost_equal(big_identity_check.coeffRef(1, 1), 1.0));
+    assert(almost_equal(big_identity_check.coeffRef(2, 2), 1.0));
+    assert(almost_equal(big_identity_check.coeffRef(3, 3), 1.0));
+    assert(almost_equal(big_identity_check.coeffRef(4, 4), 1.0));
+    assert(almost_equal(big_identity_check.coeffRef(5, 5), 1.0));
+    assert(almost_equal(big_identity_check.coeffRef(6, 6), 1.0));
 
     cout << "Inverse test passed!" << endl;
 }

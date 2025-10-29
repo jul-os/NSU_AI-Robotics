@@ -1,6 +1,7 @@
 #include "matrix.hpp"
 #include <iostream>
 #include <limits>
+#include <algorithm>
 
 using namespace std;
 Matrix::Matrix() : num_rows(0), num_cols(0), m_data() {}
@@ -196,6 +197,7 @@ Matrix &Matrix::operator-=(const Matrix &mat)
     }
     // todo что такое move и почему он тут используется
     m_data = std::move(new_data);
+    // переставляет указатели вместо того чтобы полностью копировать
 
     return *this;
 }
@@ -328,15 +330,12 @@ Matrix &Matrix::setZero()
     return *this;
 }
 
-Matrix &Matrix ::setConstants(double value)
+// todo stdfill
+Matrix &Matrix::setConstants(double value)
 {
-    // todo stdfill
-    for (int i = 0; i < num_rows; ++i)
+    for (auto &row : m_data)
     {
-        for (int j = 0; j < num_cols; ++j)
-        {
-            m_data[i][j] = value;
-        }
+        std::fill(row.begin(), row.end(), value);
     }
     return *this;
 }
