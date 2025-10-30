@@ -345,7 +345,6 @@ void test_inverse()
     assert(big_inv.isValid());
 
     Matrix big_identity_check = big * big_inv;
-    big_identity_check.setIdentity();
 
     assert(almost_equal(big_identity_check.coeffRef(0, 0), 1.0));
     assert(almost_equal(big_identity_check.coeffRef(1, 1), 1.0));

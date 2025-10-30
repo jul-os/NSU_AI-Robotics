@@ -48,29 +48,6 @@ void TableParser::parseDataLines(istream &input, int num_columns,
         auto row = splitLine(line, num_columns);
         rows.push_back(row);
     }
-
-    /*
-        string line;
-        while (getline(input, line))
-        {
-            if (line.empty())
-                continue;
-
-            cout << "DEBUG Line: '" << line << "'" << endl; // ← добавить эту строку
-
-            auto row = splitLine(line, num_columns);
-
-            // Отладочная печать результата разбиения
-            cout << "DEBUG Parsed: ";
-            for (const auto &cell : row)
-            {
-                cout << "['" << cell << "'] ";
-            }
-            cout << endl;
-
-            rows.push_back(row);
-        }
-        */
 }
 
 vector<string> TableParser::splitLine(const string &line, int num_columns)
@@ -137,14 +114,8 @@ vector<int> TableFormatter::calculateColumnWidths(const vector<vector<string>> &
     {
         for (size_t i = 0; i < row.size(); ++i)
         {
-            widths[i] = max(widths[i], (int)row[i].length());
+            widths[i] = max(widths[i], (int)row[i].length()) + 2;
         }
-    }
-
-    // тступы по 1 пробелу с каждой стороны
-    for (auto &width : widths)
-    {
-        width += 2;
     }
 
     return widths;

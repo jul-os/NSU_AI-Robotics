@@ -21,7 +21,6 @@ private:
     bool parseAlignmentLine(std::istream &input, std::vector<char> &alignments);
     void parseDataLines(std::istream &input, int num_columns,
                         std::vector<std::vector<std::string>> &rows);
-
     std::vector<std::string> splitLine(const std::string &line, int num_columns);
 };
 
@@ -44,11 +43,11 @@ private:
 // Основной класс, управляющий работой с таблицей
 class TableManager
 {
-private:
-    std::vector<char> alignments;
-    std::vector<std::vector<std::string>> rows;
-
 public:
     // Основная функция обработки аблицы
     void process(std::istream &input, std::ostream &output);
+
+private:
+    std::vector<char> alignments;
+    std::vector<std::vector<std::string>> rows;
 };

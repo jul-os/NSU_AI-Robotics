@@ -195,7 +195,6 @@ Matrix &Matrix::operator-=(const Matrix &mat)
             new_data[i][j] = m_data[i][j] - mat.m_data[i][j];
         }
     }
-    // todo что такое move и почему он тут используется
     m_data = std::move(new_data);
     // переставляет указатели вместо того чтобы полностью копировать
 
@@ -330,7 +329,6 @@ Matrix &Matrix::setZero()
     return *this;
 }
 
-// todo stdfill
 Matrix &Matrix::setConstants(double value)
 {
     for (auto &row : m_data)
