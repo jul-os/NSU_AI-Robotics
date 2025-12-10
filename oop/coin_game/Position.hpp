@@ -18,7 +18,15 @@ struct Position
     {
         return x == other.x && y == other.y;
     }
-
+    bool operator<(const Position &other) const
+    {
+        // Сначала сравниваем по x, затем по y
+        if (x != other.x)
+        {
+            return x < other.x;
+        }
+        return y < other.y;
+    }
     int DistanceTo(const Position &other) const
     {
         return std::abs(x - other.x) + std::abs(y - other.y);

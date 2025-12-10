@@ -5,21 +5,23 @@
 #include <memory>
 
 class GameField;
-// fixme why is it here
+class Robot;
+// роботам надо знать текущее положение игры чтобы решить куда двигаться
 struct GameState
 {
-    const GameField &field;
+    GameField &field;
     const std::vector<Robot *> &allRobots;
     const Robot &currentRobot;
     int currentTurn;
     int totalTurns;
 
-    GameState(const GameField &f, const std::vector<Robot *> &robots,
+    GameState(GameField &f, const std::vector<Robot *> &robots,
               const Robot &current, int turn, int total)
         : field(f), allRobots(robots), currentRobot(current),
-          currentTurn(turn), totalTurns(total) {}
+          currentTurn(turn), totalTurns(total)
+    {
+    }
 };
-
 class Robot
 {
 public:
@@ -33,12 +35,11 @@ public:
     virtual Direction DecideMove(const GameState &state) = 0;
 
     // Базовые методы перемещения
-    void Move(Direction dir);
+    void Move(Direction dir, GameState &state);
 
     // Метод подбора монетки
     void CollectCoin()
     {
-        // todo чтобы еще одновременно на поле моентка подбиралась
         _coinsCollected++;
     }
 
@@ -65,7 +66,7 @@ protected:
 
 // Конкретные стратегии
 
-// двигается в рандомном направлении
+// Двигается в рандомном направлении
 class RandomRobot : public Robot
 {
 public:
@@ -73,7 +74,7 @@ public:
     Direction DecideMove(const GameState &state) override;
 };
 
-// жадно собирает монетки
+// Жадно собирает монетки
 class GreedyRobot : public Robot
 {
 public:
@@ -81,4 +82,38 @@ public:
     Direction DecideMove(const GameState &state) override;
 };
 
-// todo и еще штук 5 или сколько по заданию
+// Осторожный робот - избегает других роботов
+class CautiousRobot : public Robot
+{
+public:
+    CautiousRobot() : Robot("CautiousRobot") {}
+    Direction DecideMove(const GameState &state) override;
+};
+
+// Патрулирующий робот - движется по маршруту
+class PatrollingRobot : public Robot
+{
+private:
+    bool _movingRight = true;
+    bool _movingDown = true;
+
+public:
+    PatrollingRobot() : Robot("PatrollingRobot") {}
+    Direction DecideMove(const GameState &state) override;
+};
+
+// Умный робот - комбинированная стратегия
+class SmartRobot : public Robot
+{
+public:
+    SmartRobot() : Robot("SmartRobot") {}
+    Direction DecideMove(const GameState &state) override;
+};
+
+// Агрессивный робот - пытается мешать другим
+class AggressiveRobot : public Robot
+{
+public:
+    AggressiveRobot() : Robot("AggressiveRobot") {}
+    Direction DecideMove(const GameState &state) override;
+};

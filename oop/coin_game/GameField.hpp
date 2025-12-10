@@ -4,12 +4,12 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <random>
 
-class Robot; // forward declaration
+class Robot;
 
 class GameField
 {
-
 public:
     GameField(size_t w, size_t h);
 
@@ -19,18 +19,19 @@ public:
     void RemoveCoin(const Position &pos);
     int GetCoinCount() const;
 
-    // Управление роботами
-    bool PlaceRobot(Robot *robot, Position pos);
-    bool PlaceRobotRandomly(Robot *robot);
-    void RemoveRobot(const Position &pos);
+    // Управление роботами - переработанные методы
+    bool PlaceRobot(std::unique_ptr<Robot> robot);
+    bool MoveRobot(Robot *robot, const Position &newPos);
     Robot *GetRobotAt(const Position &pos) const;
+    void RemoveRobot(const Position &pos);
 
     std::vector<Position> GetRobotPositions() const;
     std::vector<Position> GetCoinPositions() const;
+    std::vector<Robot *> GetAllRobots() const;
 
-    // Валидация и визуализация
+    // Валидация позиции
     bool IsValidPosition(const Position &pos) const;
-    void Visualize() const; // fixme в отдельном
+    void Visualize() const;
 
     // Геттеры
     size_t GetWidth() const { return _width; }
@@ -39,5 +40,11 @@ public:
 private:
     size_t _width, _height;
     std::vector<std::vector<bool>> _coins;
-    std::map<Position, Robot *> _robots;
+    std::map<Position, std::unique_ptr<Robot>> _robots;
+
+    mutable std::random_device _rd;
+    mutable std::mt19937 _gen;
+
+    // Вспомогательные методы
+    Position FindFreePosition() const;
 };
