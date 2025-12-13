@@ -7,7 +7,17 @@
 #include "serialize.h"
 
 using namespace std;
+struct Point
+{
+    int x;
+    int y;
+    double z;
 
+    bool operator==(const Point &other) const
+    {
+        return x == other.x && y == other.y && z == other.z;
+    }
+};
 int main()
 {
     // === 1. Старые тесты (POD) ===
@@ -44,7 +54,7 @@ int main()
     // === 2. Тест std::string ===
     {
         ofstream ofs("test.ser", ofstream::out | ofstream::binary);
-        string s1 = "Привет, мир! 🌍";
+        string s1 = "Привет, мир!";
         serialize(s1, ofs);
         ofs.close();
 
@@ -79,6 +89,7 @@ int main()
             cout << "std::vector<int> FAILED!" << endl;
     }
 
+    // todo вектор структур каких-нибудь
     // === 4. Тест std::vector<std::string> (вложенность) ===
     {
         ofstream ofs("test.ser", ofstream::out | ofstream::binary);
@@ -146,6 +157,39 @@ int main()
         else
             cout << "Empty containers FAILED!" << endl;
     }
+    // === 7. Тест std::vector<Point> ===
+    {
+        ofstream ofs("test.ser", ofstream::out | ofstream::binary);
+        vector<Point> points1 = {
+            {1, 2, 3.5},
+            {-10, 0, 0.0},
+            {100, -200, -123.456}};
+        serialize(points1, ofs);
+        ofs.close();
 
+        vector<Point> points2;
+        ifstream ifs("test.ser", ifstream::in | ifstream::binary);
+        ifs >> noskipws;
+        deserialize(points2, ifs);
+        ifs.close();
+
+        bool ok = (points1.size() == points2.size());
+        if (ok)
+        {
+            for (size_t i = 0; i < points1.size(); ++i)
+            {
+                if (!(points1[i] == points2[i]))
+                {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+
+        if (ok)
+            cout << "std::vector<Point> OK!" << endl;
+        else
+            cout << "std::vector<Point> FAILED!" << endl;
+    }
     return 0;
 }

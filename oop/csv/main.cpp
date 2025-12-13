@@ -8,7 +8,10 @@
 #include <iterator>
 #include <vector>
 
+// todo тесты написать
+
 // остановка рекурсии
+// когда I дошел до конца (до I == sizeof...(Args)) рекурсия стоп
 template <std::size_t I = 0, typename... Args, typename Ch, typename Tr>
 typename std::enable_if<(I == sizeof...(Args)), void>::type
 printTuple(std::basic_ostream<Ch, Tr> &out, std::tuple<Args...> t)
@@ -17,6 +20,8 @@ printTuple(std::basic_ostream<Ch, Tr> &out, std::tuple<Args...> t)
 }
 
 // тело рекурсии
+// печатает I-ый элемент кортежа, вызывает себя на I+1
+// перед каждым элементом кроме первого запятая
 template <size_t I = 0, typename... Args, typename Ch, typename Tr>
 typename std::enable_if<(I < sizeof...(Args)), void>::type
 printTuple(std::basic_ostream<Ch, Tr> &out, std::tuple<Args...> t)
@@ -27,6 +32,7 @@ printTuple(std::basic_ostream<Ch, Tr> &out, std::tuple<Args...> t)
     printTuple<I + 1>(out, t);
 }
 
+// перегрузка оператора << для std::tuple
 template <typename... Args, typename Ch, typename Tr>
 std::ostream &operator<<(std::basic_ostream<Ch, Tr> &out, std::tuple<Args...> const &t)
 {
@@ -84,7 +90,7 @@ template <typename... Args>
 class CSVParser
 {
 private:
-    using val = std::tuple<Args...>;
+    using val = std::tuple<Args...>; // тип одной строки данных. например int, double
     std::ifstream &file_;
     val current_;
 
@@ -100,6 +106,8 @@ private:
 public:
     class iterator
     {
+        // чтобы использовать CSVParser range-based for
+        // or begin()/end()
         CSVParser *x_;
 
     public:
@@ -139,6 +147,7 @@ public:
 
     CSVParser(std::ifstream &f, int const skip_lines = 0) : file_(f), N(skip_lines)
     {
+        // принимает открытй файл, пропускает skip_lines строк, читает первую после
         for (int i = 0; i < N; ++i)
             skip();
         next();
@@ -177,6 +186,11 @@ public:
     }
     void next()
     {
+        // читает символы по одному из файла
+        // нашел " - флаг escaped, с ним любые символы просто добавляются в строку
+        // потом в конуе должен проверить что " закрыто
+        // если нашел разделители , \n то завершанет колонку\строку
+        // вектор строк в кортеж чрез vector2tuple
         using tmp_store = std::vector<std::string>;
         bool escaped = false;
         char c;

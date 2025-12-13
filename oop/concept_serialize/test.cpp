@@ -3,6 +3,15 @@
 #include <cassert>
 #include <iostream>
 
+struct Point
+{
+    int x;
+    int y;
+    double z;
+
+    bool operator==(const Point &other) const = default;
+};
+
 void test_pod()
 {
     std::cout << "Testing POD types...\n";
@@ -22,7 +31,7 @@ void test_pod()
         deserialize(d2, ss);
         assert(d == d2);
     }
-    std::cout << "OK\n\n";
+    std::cout << "OK\n";
 }
 
 void test_string()
@@ -34,7 +43,7 @@ void test_string()
     std::string s2;
     deserialize(s2, ss);
     assert(s1 == s2);
-    std::cout << "OK\n\n";
+    std::cout << "OK\n";
 }
 
 void test_vector_int()
@@ -46,7 +55,7 @@ void test_vector_int()
     std::vector<int> v2;
     deserialize(v2, ss);
     assert(v1 == v2);
-    std::cout << "OK\n\n";
+    std::cout << "OK\n";
 }
 
 void test_vector_string()
@@ -58,7 +67,7 @@ void test_vector_string()
     std::vector<std::string> v2;
     deserialize(v2, ss);
     assert(v1 == v2);
-    std::cout << "OK\n\n";
+    std::cout << "OK\n";
 }
 
 void test_map()
@@ -73,16 +82,22 @@ void test_map()
     std::map<std::string, int> m2;
     deserialize(m2, ss);
     assert(m1 == m2);
-    std::cout << "OK\n\n";
+    std::cout << "OK\n";
 }
-
-// Попытка скомпилировать несериализуемый тип — должна дать ошибку!
-// struct NonSerializable { std::string* ptr; };
-// void test_bad() {
-//     NonSerializable x;
-//     std::stringstream ss;
-//     serialize(x, ss); // ← должно быть ОШИБКОЙ КОМПИЛЯЦИИ
-// }
+void test_vector_point()
+{
+    std::cout << "Testing std::vector<Point> (custom trivially copyable struct)...\n";
+    std::vector<Point> v1 = {
+        {1, 2, 3.5},
+        {-10, 0, 0.0},
+        {100, -200, -123.456}};
+    std::stringstream ss;
+    serialize(v1, ss);
+    std::vector<Point> v2;
+    deserialize(v2, ss);
+    assert(v1 == v2);
+    std::cout << "OK\n";
+}
 
 int main()
 {
@@ -91,7 +106,8 @@ int main()
     test_vector_int();
     test_vector_string();
     test_map();
+    test_vector_point();
 
-    std::cout << "🎉 All tests passed!\n";
+    std::cout << "All tests passed!\n";
     return 0;
 }
