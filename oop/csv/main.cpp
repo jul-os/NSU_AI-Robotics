@@ -142,7 +142,15 @@ public:
             }
         }
     };
-    iterator begin() { return iterator{this}; }
+    iterator begin()
+    {
+        // Если сразу после конструирования у нас ошибка или нет данных — вернуть end()
+        if (!valid() || err_)
+        {
+            return end();
+        }
+        return iterator{this};
+    }
     iterator end() { return iterator{}; }
 
     CSVParser(std::ifstream &f, int const skip_lines = 0) : file_(f), N(skip_lines)
@@ -258,9 +266,9 @@ public:
     }
 };
 
+#ifndef UNIT_TESTING
 int main()
 {
-
     std::ifstream file("test.txt");
     if (!file.is_open())
     {
@@ -277,14 +285,15 @@ int main()
             std::cout << *it << std::endl;
         }
     }
-    catch (std::runtime_error err)
+    catch (std::runtime_error &err)
     {
         std::cout << "ERROR:" << err.what() << "\n";
     }
-    catch (std::invalid_argument err)
+    catch (std::invalid_argument &err)
     {
         std::cout << "ERROR:" << err.what() << "\n";
     }
 
     return 0;
 }
+#endif
