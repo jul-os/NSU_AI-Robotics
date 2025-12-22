@@ -4,7 +4,7 @@
 
 #include <memory>
 
-class Kettle; // forward declaration — достаточно для ссылки
+class Kettle;
 
 class HeatingStrategy
 {

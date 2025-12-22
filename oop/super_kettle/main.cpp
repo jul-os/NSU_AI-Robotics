@@ -38,7 +38,7 @@ void printNotificationMenu()
 int main()
 {
     auto notifier = std::make_shared<NotificationManager>();
-    // Подписываем базовые каналы
+    // подписываем базовые каналы
     notifier->subscribe(std::make_shared<SoundChannel>(), Priority::LOW);
     notifier->subscribe(std::make_shared<SMSChannel>(), Priority::MEDIUM);
     notifier->subscribe(std::make_shared<EmailChannel>(), Priority::HIGH);

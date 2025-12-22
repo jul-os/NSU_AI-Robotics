@@ -1,4 +1,3 @@
-// tests/kettle_tests.cpp
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>
@@ -7,7 +6,6 @@
 #include "NotificationManager.h"
 #include "Kettle.h"
 
-// === Mock-канал для тестирования ===
 class MockChannel : public NotificationChannel
 {
 public:
@@ -34,7 +32,7 @@ public:
     }
 };
 
-// === Тесты стратегий ===
+//  Тесты стратегий
 TEST(HeatingStrategyTest, FastHeating_IncreasesTempBy3AndDecreasesWater)
 {
     Kettle kettle;
@@ -64,7 +62,7 @@ TEST(HeatingStrategyTest, EcoHeating_IncreasesTempBy1AndDecreasesWaterLess)
 TEST(HeatingStrategyTest, PreciseHeating_UsesLargeStepWhenFarFromTarget)
 {
     Kettle kettle;
-    kettle.setTargetTemp(100.0f); // далеко от 20°C
+    kettle.setTargetTemp(100.0f);
     float before = kettle.getCurrentTemp();
 
     PreciseHeating strategy;
@@ -77,9 +75,7 @@ TEST(HeatingStrategyTest, PreciseHeating_UsesSmallStepWhenCloseToTarget)
 {
     Kettle kettle;
     kettle.setTargetTemp(80.0f);
-    // Установим текущую температуру в 78°C (без цикла)
-    // Начальная — 20, поэтому добавим 58
-    kettle.increaseTemp(58.0f); // 20 + 58 = 78
+    kettle.increaseTemp(58.0f);
     float before = kettle.getCurrentTemp();
 
     PreciseHeating strategy;
@@ -88,7 +84,7 @@ TEST(HeatingStrategyTest, PreciseHeating_UsesSmallStepWhenCloseToTarget)
     EXPECT_NEAR(kettle.getCurrentTemp(), before + 0.3f, 1e-5f);
 }
 
-// === Тесты Kettle ===
+// Тесты Kettle
 TEST(KettleTest, TurnOnWithLowWater_SendsCriticalAlertAndDoesNotTurnOn)
 {
     auto mock = std::make_shared<MockChannel>();
@@ -97,7 +93,7 @@ TEST(KettleTest, TurnOnWithLowWater_SendsCriticalAlertAndDoesNotTurnOn)
 
     Kettle kettle;
     kettle.setNotifier(notifier);
-    kettle.setWaterLevel(0.05f); // < 0.1 → мало воды
+    kettle.setWaterLevel(0.05f);
 
     kettle.turnOn();
 
@@ -113,7 +109,7 @@ TEST(KettleTest, TurnOnReachesTarget_TurnsOffAndSendsNotifications)
 
     Kettle kettle;
     kettle.setNotifier(notifier);
-    kettle.setTargetTemp(25.0f); // чуть выше начальных 20°C
+    kettle.setTargetTemp(25.0f);
     kettle.setHeatingStrategy(std::make_unique<PreciseHeating>());
 
     kettle.turnOn();
@@ -131,7 +127,7 @@ TEST(KettleTest, OverheatDetection_TurnsOffAndAlerts)
 
     Kettle kettle;
     kettle.setNotifier(notifier);
-    kettle.setTargetTemp(120.0f); // выше безопасного предела
+    kettle.setTargetTemp(120.0f);
     kettle.setHeatingStrategy(std::make_unique<FastHeating>());
 
     kettle.turnOn();
@@ -140,7 +136,7 @@ TEST(KettleTest, OverheatDetection_TurnsOffAndAlerts)
     EXPECT_TRUE(mock->hasMessage("CRITICAL: Overheat detected!"));
 }
 
-// === Тесты NotificationManager ===
+//  Тесты NotificationManager
 TEST(NotificationManagerTest, LowPriorityMessageNotSentToHighPriorityChannel)
 {
     auto email = std::make_shared<MockChannel>();

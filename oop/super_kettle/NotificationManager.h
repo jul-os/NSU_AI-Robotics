@@ -1,4 +1,3 @@
-// NotificationManager.h
 #ifndef NOTIFICATION_MANAGER_H
 #define NOTIFICATION_MANAGER_H
 
