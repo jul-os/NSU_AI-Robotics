@@ -1,0 +1,12 @@
+hostname, ip, average rtt, icmp_seq, ttl
+google.com, 173.194.221.101, 69.551, 1, 114
+example.com, 8.6.112.0, 86.644, 1, 56
+habr.com, 178.248.237.68, 108.927, 1, 58
+github.com, 140.82.121.4, 93.199, 1, 56
+diyrobocars.com, 162.241.218.94, 247.292, 1, 55
+dlcourse.ai, 185.199.109.153, 179.421, 1, 54
+youtube.com, 127.0.0.1, 0.048, 1, 64
+docs.pytorch.org, 185.199.110.153, 136.271, 1, 54
+unix.stackexchange.com, 198.252.206.1, 99.897, 1, 56
+classroom.google.com, 64.233.164.101, 70.135, 1, 111
+docs.donkeycar.com, 185.199.110.153, 134.811, 1, 54

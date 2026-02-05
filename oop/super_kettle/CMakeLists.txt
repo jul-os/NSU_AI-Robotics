@@ -9,13 +9,4 @@ add_executable(kettle
     main.cpp
     Kettle.cpp
     HeatingStrategy.cpp
-    # Если у тебя есть NotificationManager.cpp — добавь его тоже
 )
-
-# Если у тебя есть отдельный файл NotificationManager.cpp:
-# add_executable(kettle
-#     main.cpp
-#     Kettle.cpp
-#     HeatingStrategy.cpp
-#     NotificationManager.cpp
-# )
