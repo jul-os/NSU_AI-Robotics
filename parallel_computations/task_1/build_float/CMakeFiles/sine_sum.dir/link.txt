@@ -1,0 +1,1 @@
+/usr/bin/cc -Wl,--dependency-file=CMakeFiles/sine_sum.dir/link.d CMakeFiles/sine_sum.dir/main.c.o -o sine_sum  -lm
