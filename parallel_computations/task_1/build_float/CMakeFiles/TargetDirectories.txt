@@ -1,3 +1,0 @@
-/home/julia/Рабочий стол/code/NSU_AI-Robotics/parallel_computations/task_1/build_float/CMakeFiles/sine_sum.dir
-/home/julia/Рабочий стол/code/NSU_AI-Robotics/parallel_computations/task_1/build_float/CMakeFiles/edit_cache.dir
-/home/julia/Рабочий стол/code/NSU_AI-Robotics/parallel_computations/task_1/build_float/CMakeFiles/rebuild_cache.dir
