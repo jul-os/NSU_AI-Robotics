@@ -10,7 +10,7 @@ typedef float real_t;
 #else
 typedef double real_t;
 #define REAL_SIN sin
-#define REAL_PRINT "%.10lf"
+#define REAL_PRINT "%.30lf"
 #define REAL_PI 3.14159265358979323846
 #endif
 
