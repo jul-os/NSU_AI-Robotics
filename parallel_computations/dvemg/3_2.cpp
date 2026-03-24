@@ -28,8 +28,6 @@ int main()
         volatile int done_flag = 0;
         double bNorm = 0.0;
 
-        const auto start{std::chrono::steady_clock::now()};
-
 #pragma omp parallel num_threads(num_threads) shared(A, b, x, residual, Ax, N, tau, done_flag, bNorm)
         {
 #pragma omp for collapse(2) nowait
@@ -47,6 +45,7 @@ int main()
                 b[i] = N + 1.0;
             }
 
+            const auto start{std::chrono::steady_clock::now()};
 #pragma omp barrier
 
             double sum = 0.0;
