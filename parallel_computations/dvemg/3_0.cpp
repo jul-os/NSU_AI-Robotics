@@ -2,6 +2,7 @@
 #include <vector>
 #include <cmath>
 #include <iomanip>
+#include <chrono>
 
 #define EPS 1e-5
 #define MAX_ITERATIONS 10000
@@ -96,16 +97,18 @@ int main()
 
     vector<double> b(N, N + 1.0);
 
-    double tau;
-    cout << "Введите параметр tau (рекомендуется 0.01 или -0.01) ";
-    cin >> tau;
+    double tau = 0.9 * 2.0/(N+1);
 
+    const auto start{std::chrono::steady_clock::now()};
     vector<double> solution = simpleIterationMethod(A, b, tau);
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed_seconds{end - start};
     cout << "Полученное решение:" << endl;
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < 10; i++)
     {
         cout << "x[" << i << "] = " << fixed << setprecision(6) << solution[i] << endl;
     }
     cout << "В этом случае правильным решением системы будет вектор, элементы которого равны 1.0" << endl;
+    cout << "Время:" << elapsed_seconds.count() << endl;
     return 0;
 }

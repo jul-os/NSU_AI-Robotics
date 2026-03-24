@@ -2,6 +2,7 @@
 #include <vector>
 #include <cmath>
 #include <iomanip>
+#include <chrono>
 #include <omp.h>
 
 #define EPS 1e-5
@@ -9,11 +10,10 @@
 
 using namespace std;
 
-double vectorNorm(const vector<double> &v)
+double vectorNorm(const vector<double> &v, const int num_th)
 {
     double sum = 0.0;
-#pragma omp parallel for reduction(+ : sum)
-    // ask
+#pragma omp parallel for reduction(+ : sum) num_threads(num_th)
     for (size_t i = 0; i < v.size(); i++)
     {
         sum += v[i] * v[i];
@@ -22,11 +22,11 @@ double vectorNorm(const vector<double> &v)
 }
 
 vector<double> matrixVectorMultiply(const vector<vector<double>> &A,
-                                    const vector<double> &x)
+                                    const vector<double> &x, const int num_th)
 {
     int N = A.size();
     vector<double> result(N, 0.0);
-#pragma omp parallel for
+#pragma omp parallel for num_threads(num_th)
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < N; j++)
@@ -39,35 +39,36 @@ vector<double> matrixVectorMultiply(const vector<vector<double>> &A,
 }
 
 // Функция для вычисления Ax - b
-vector<double> computeResidual(const vector<vector<double>> &A,
+void computeResidual(const vector<vector<double>> &A,
                                const vector<double> &x,
-                               const vector<double> &b)
+                               const vector<double> &b,
+                               vector<double> &residual,
+                               const int num_th)
 {
-    vector<double> Ax = matrixVectorMultiply(A, x);
-    vector<double> residual(Ax.size());
-#pragma omp parallel for
+    vector<double> Ax = matrixVectorMultiply(A, x, num_th);
+#pragma omp parallel for num_threads(num_th)
     for (size_t i = 0; i < Ax.size(); i++)
     {
         residual[i] = Ax[i] - b[i];
     }
-
-    return residual;
 }
 
 vector<double> simpleIterationMethod(const vector<vector<double>> &A,
                                      const vector<double> &b,
-                                     double tau)
+                                     double tau, 
+                                     const int num_th)
 {
     int N = A.size();
 
     vector<double> x(N, 0.0);
+    vector<double> residual(N);
 
-    double bNorm = vectorNorm(b);
+    double bNorm = vectorNorm(b, num_th);
 
     for (int iter = 0; iter < MAX_ITERATIONS; iter++)
     {
-        vector<double> residual = computeResidual(A, x, b);
-        double residualNorm = vectorNorm(residual);
+        computeResidual(A, x, b, residual, num_th);
+        double residualNorm = vectorNorm(residual, num_th);
         double stoppingCriterion = residualNorm / bNorm;
 
         if (stoppingCriterion < EPS)
@@ -76,7 +77,7 @@ vector<double> simpleIterationMethod(const vector<vector<double>> &A,
             return x;
         }
 
-#pragma omp parallel for
+#pragma omp parallel for num_threads(num_th)
         for (int i = 0; i < N; i++)
         {
             x[i] = x[i] - tau * residual[i];
@@ -89,31 +90,40 @@ vector<double> simpleIterationMethod(const vector<vector<double>> &A,
 
 int main()
 {
+    int max_threads = omp_get_max_threads();
     int N;
     cout << "Введите N ";
     cin >> N;
+    for (int num_th = 1; num_th <= max_threads; num_th++){
+        vector<vector<double>> A(N, vector<double>(N));
+#pragma omp parallel for num_threads(num_th)
+        for (int i = 0; i < N; i++)
+        {
+            for (int j = 0; j< N; j++){
+                i==j ? A[i][j] = 2.0 : A[i][j] = 1.0;
+            }
+        }
 
-    vector<vector<double>> A(N, vector<double>(N, 1.0));
-#pragma omp parallel for
-    // ask как параллельно инициализировать
-    for (int i = 0; i < N; i++)
-    {
-        A[i][i] = 2.0;
+        vector<double> b(N);
+#pragma omp parallel for num_threads(num_th)
+        for (int i = 0; i < N; i++)
+        {
+            b[i]= N + 1.0;
+        }
+
+        double tau = 0.9 * 2.0/(N+1);
+
+        const auto start{std::chrono::steady_clock::now()};
+        vector<double> solution = simpleIterationMethod(A, b, tau, num_th);
+        const auto end{std::chrono::steady_clock::now()};
+        const std::chrono::duration<double> elapsed_seconds{end - start};
+        cout << "Полученное решение:" << endl;
+        for (int i = 0; i < 5; i++)
+        {
+            cout << "x[" << i << "] = " << fixed << setprecision(6) << solution[i] << endl;
+        }
+        cout << "В этом случае правильным решением системы будет вектор, элементы которого равны 1.0" << endl;
+        cout << "Количество потоков:"<< num_th <<"Время:" << elapsed_seconds.count() << endl;
     }
-
-    // ask как параллельно инициализировать
-    vector<double> b(N, N + 1.0);
-
-    double tau;
-    cout << "Введите параметр tau (рекомендуется 0.01 или -0.01) ";
-    cin >> tau;
-
-    vector<double> solution = simpleIterationMethod(A, b, tau);
-    cout << "Полученное решение:" << endl;
-    for (int i = 0; i < N; i++)
-    {
-        cout << "x[" << i << "] = " << fixed << setprecision(6) << solution[i] << endl;
-    }
-    cout << "В этом случае правильным решением системы будет вектор, элементы которого равны 1.0" << endl;
     return 0;
 }
