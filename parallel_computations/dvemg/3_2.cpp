@@ -27,8 +27,10 @@ int main()
         double tau = 0.9 * 2.0 / (N + 1);
         volatile int done_flag = 0;
         double bNorm = 0.0;
+        double sum = 0.0;
+        std::chrono::steady_clock::time_point start_time;
 
-#pragma omp parallel num_threads(num_threads) shared(A, b, x, residual, Ax, N, tau, done_flag, bNorm)
+#pragma omp parallel num_threads(num_threads) shared(A, b, x, residual, Ax, N, tau, done_flag, bNorm, sum, start_time)
         {
 #pragma omp for collapse(2) nowait
             for (int i = 0; i < N; i++)
@@ -45,19 +47,21 @@ int main()
                 b[i] = N + 1.0;
             }
 
-            const auto start{std::chrono::steady_clock::now()};
 #pragma omp barrier
 
-            double sum = 0.0;
+            sum = 0.0;
+#pragma omp for reduction(+ : sum)
             for (size_t i = 0; i < b.size(); i++)
             {
-#pragma omp atomic
                 sum += b[i] * b[i];
             }
 #pragma omp single
             {
                 bNorm = sqrt(sum);
+                start_time = std::chrono::steady_clock::now();
             }
+
+#pragma omp barrier
 
             for (int iter = 0; iter < MAX_ITERATIONS; iter++)
             {
@@ -71,61 +75,57 @@ int main()
                     }
                 }
 
-#pragma omp for
+#pragma omp for nowait
                 for (size_t i = 0; i < Ax.size(); i++)
                 {
                     residual[i] = Ax[i] - b[i];
                 }
 
-                double local_sum = 0.0;
+                sum = 0.0;
+#pragma omp for reduction(+ : sum)
                 for (size_t i = 0; i < N; i++)
                 {
-#pragma omp atomic
-                    local_sum += residual[i] * residual[i];
+                    sum += residual[i] * residual[i];
                 }
 
                 double residualNorm, stoppingCriterion;
 #pragma omp single
                 {
-                    residualNorm = sqrt(local_sum);
+                    residualNorm = sqrt(sum);
                     stoppingCriterion = residualNorm / bNorm;
 
                     if (stoppingCriterion < EPS && done_flag == 0)
                     {
+                        cout << "Достигнута требуемая точность на итерации " << iter + 1 << endl;
                         done_flag = 1;
                     }
                 }
 
 #pragma omp barrier
+                if (done_flag)
+                    break;
 
-                if (done_flag == 0)
+#pragma omp for
+                for (int i = 0; i < N; i++)
                 {
-#pragma omp single
+                    if (done_flag == 0)
                     {
-                        for (int i = 0; i < N; i++)
-                        {
-                            x[i] = x[i] - tau * residual[i];
-                        }
+                        x[i] = x[i] - tau * residual[i];
                     }
                 }
-
-#pragma omp barrier
             }
 
 #pragma omp single
             {
                 const auto end{std::chrono::steady_clock::now()};
-                const std::chrono::duration<double> elapsed_seconds{end - start};
-                /*
+                double elapsed = std::chrono::duration<double>(end - start_time).count();
                 cout << "Полученное решение (потоков: " << num_threads << "):" << endl;
-
                 for (int i = 0; i < 10; i++)
                 {
                     cout << "x[" << i << "] = " << fixed << setprecision(6) << x[i] << endl;
                 }
-                    */
                 cout << "В этом случае правильным решением системы будет вектор, элементы которого равны 1.0" << endl;
-                cout << "Потоки: " << num_threads << ", Время: " << elapsed_seconds.count() << endl;
+                cout << "Время:" << elapsed << endl;
             }
         }
     }
