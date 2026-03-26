@@ -134,7 +134,7 @@ int main()
     {
         vector<vector<double>> A(N, vector<double>(N));
 
-#pragma omp parallel for num_threads(num_th)
+#pragma omp parallel for num_threads(num_threads)
         for (int i = 0; i < N; i++)
         {
             for (int j = 0; j < N; j++)
@@ -144,7 +144,7 @@ int main()
         }
 
         vector<double> b(N);
-#pragma omp parallel for num_threads(num_th)
+#pragma omp parallel for num_threads(num_threads)
         for (int i = 0; i < N; i++)
         {
             b[i] = N + 1.0;
