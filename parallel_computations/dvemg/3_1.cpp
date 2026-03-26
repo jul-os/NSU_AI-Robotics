@@ -73,7 +73,6 @@ vector<double> simpleIterationMethod(const vector<vector<double>> &A,
 
         if (stoppingCriterion < EPS)
         {
-            cout << "Достигнута требуемая точность на итерации " << iter + 1 << endl;
             return x;
         }
 
@@ -83,8 +82,6 @@ vector<double> simpleIterationMethod(const vector<vector<double>> &A,
             x[i] = x[i] - tau * residual[i];
         }
     }
-
-    cout << "Достигнуто максимальное число итераций" << endl;
     return x;
 }
 
