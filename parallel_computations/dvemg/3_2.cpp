@@ -41,7 +41,7 @@ int main()
                 }
             }
 
-#pragma omp for nowait
+#pragma omp for
             for (int i = 0; i < N; i++)
             {
                 b[i] = N + 1.0;
@@ -75,7 +75,7 @@ int main()
                     }
                 }
 
-#pragma omp for nowait
+#pragma omp for
                 for (size_t i = 0; i < Ax.size(); i++)
                 {
                     residual[i] = Ax[i] - b[i];
