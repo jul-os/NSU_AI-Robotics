@@ -114,7 +114,7 @@ double measure_time(Func&& f) {
 }
 
 int main(int argc, char* argv[]) {
-    size_t n = (argc > 1) ? stoull(argv[1]) : 2000;
+    size_t n = (argc > 1) ? stoull(argv[1]) : 20000;
     vector<size_t> thread_counts = {2, 4, 7, 8, 16, 20, 40};
     
     cout << fixed << setprecision(4);
@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
         });
         
         
-        double speedup = (nt > 2) ? baseline_time / par_time : 0.0;
+        double speedup = baseline_time / par_time;
         
         cout << setw(10) << nt 
              << setw(15) << par_time 
