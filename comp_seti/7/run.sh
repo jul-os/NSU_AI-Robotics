@@ -1,37 +1,47 @@
 #!/bin/bash
 
-docker stop news-app postgres_db  && \
-docker rm news-app postgres_db  && \
-
+docker stop postgres_db  && \
+docker rm postgres_db  && \
+docker stop news-app   && \
+docker rm news-app   && \
 docker volume rm pgdata  && \
-
 docker network rm app-network  && \
-
 
 set -e
 docker network create app-network 2>/dev/null || echo "Сеть уже существует"
 
-# в конфиг nginx закидываем блок по определению российских ip
+sudo mkdir -p /etc/nginx/conf.d/geo_lists
+
+if curl -sf https://www.ipdeny.com/ipblocks/data/aggregated/ru-aggregated.zone -o /tmp/ru_ips.zone; then
+    echo "Список IP скачан, конвертируем в формат geo..."
+    {
+        echo "default 0;"
+        awk '{print $1" 1;"}' /tmp/ru_ips.zone
+    } | sudo tee /etc/nginx/conf.d/geo_lists/ru_ips.conf > /dev/null
+else
+    echo " Не удалось скачать список, используем минимальный ручной список"
+    sudo tee /etc/nginx/conf.d/geo_lists/ru_ips.conf > /dev/null << 'MINI_LIST'
+default 0;
+5.3.0.0/16 1;
+5.18.0.0/16 1;
+31.13.64.0/19 1;
+37.9.64.0/19 1;
+46.17.40.0/22 1;
+77.88.0.0/14 1;
+84.201.128.0/18 1;
+84.237.0.0/16 1;
+87.250.224.0/19 1;
+95.108.128.0/17 1;
+178.154.128.0/17 1;
+185.32.185.0/24 1;
+199.36.240.0/22 1;
+213.180.192.0/19 1;
+MINI_LIST
+fi
+
 sudo tee /etc/nginx/conf.d/news-proxy.conf > /dev/null << 'EOF'
-# Map проверяет заголовок X-Forwarded-For на совпадение с РФ префиксами
-# Используем ~ для регексов (точное начало диапазона)
-map $http_x_forwarded_for $is_blocked {
-    default 0;
-    
-    ~^5\.3\. 1;
-    ~^5\.18\. 1;
-    ~^31\.13\.64\. 1;
-    ~^37\.9\.64\. 1;
-    ~^46\.17\.40\. 1;
-    ~^77\.88\. 1;
-    ~^84\.201\.128\. 1;
-    ~^84\.237\. 1;
-    ~^87\.250\.224\. 1;
-    ~^95\.108\.128\. 1;
-    ~^178\.154\.128\. 1;
-    ~^185\.32\.185\. 1;
-    ~^199\.36\.240\. 1;
-    ~^213\.180\.192\. 1;
+geo $http_x_forwarded_for $is_blocked {
+    include /etc/nginx/conf.d/geo_lists/ru_ips.conf;
 }
 
 server {
@@ -65,7 +75,7 @@ docker run -d \
   -e POSTGRES_DB=news \
   -v pgdata:/var/lib/postgresql/data \
   -v "/home/julia/Рабочий стол/code/NSU_AI-Robotics/comp_seti/5/init.sql:/docker-entrypoint-initdb.d/init.sql" \
-  -p 5432:5432 \
+  -p 5433:5432 \
   postgres:15-alpine && \
 
 sleep 10 && \
@@ -85,4 +95,3 @@ docker run -d \
 
 docker ps && \
 echo "http://localhost/docs"
-
