@@ -51,7 +51,7 @@ server {
 
     location / {
         if ($is_blocked = 1) {
-            return 200 '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Доступ ограничен</title><style>body{font-family:sans-serif;text-align:center;padding:80px;background:#f5f5f5}h1{color:#c00;font-size:2em}p{color:#666}</style></head><body><h1>⛔ ВАМ СЮДА НЕЛЬЗЯ</h1><p>Доступ с территории РФ ограничен.</p></body></html>';
+            return 200 '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Доступ ограничен</title><style>body{font-family:sans-serif;text-align:center;padding:80px;background:#f5f5f5}h1{color:#c00;font-size:2em}p{color:#666}</style></head><body><h1>ВАМ СЮДА НЕЛЬЗЯ</h1><p>Доступ с территории РФ ограничен.</p></body></html>';
         }
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;

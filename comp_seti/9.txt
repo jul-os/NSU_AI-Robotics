@@ -1,0 +1,34 @@
+    Включена поддержка IPv6 в Docker 
+    Создана сеть news-net-v6 с подсетями 172.42.0.0/16 и fd00:cafe:feed::/64.
+    Контейнер test-v6 получил оба адреса
+
+    первые 3 пакета для ipv4
+    tcpdump -r /tmp/ipv4_ipv6.pcap -n | grep "IP " | head -3
+reading from file /tmp/ipv4_ipv6.pcap, link-type LINUX_SLL (Linux cooked v1)
+19:52:09.258673 IP 213.176.64.47.22 > 213.176.64.47.46234: Flags [P.], seq 3109153868:3109153920, ack 2173363796, win 512, options [nop,nop,TS val 1720918409 ecr 1720918400], length 52
+19:52:09.258694 IP 213.176.64.47.46234 > 213.176.64.47.22: Flags [.], ack 52, win 511, options [nop,nop,TS val 1720918409 ecr 1720918409], length 0
+19:52:09.258749 IP 213.176.64.47.443 > 84.237.54.99.42676: Flags [P.], seq 1822441610:1822441684, ack 1882605360, win 501, options [nop,nop,TS val 3069400897 ecr 2215952121], length 74
+
+
+    первые 3 пакета для IPv6
+    tcpdump -r /tmp/ipv4_ipv6.pcap -n | grep "IP6 " | head -3
+reading from file /tmp/ipv4_ipv6.pcap, link-type LINUX_SLL (Linux cooked v1)
+19:52:09.892320 IP6 fe80::fc54:ff:fef1:b316 > 2a12:5940:1ce2::2: ICMP6, neighbor solicitation, who has 2a12:5940:1ce2::2, length 32
+19:52:09.892351 IP6 2a12:5940:1ce2::2 > fe80::fc54:ff:fef1:b316: ICMP6, neighbor advertisement, tgt is 2a12:5940:1ce2::2, length 24
+19:52:10.107976 IP6 2a12:5940:1ce2::2.51200 > 2001:67c:4e8:f004::9.443: Flags [P.], seq 3981713352:3981713485, ack 2894290020, win 1804, options [nop,nop,TS val 3381412782 ecr 2702216056], length 133
+
+
+
+наблюдения:
+
+для ipv4:
+    Формат адресации        213.176.64.47 (32 бита, десятичный)
+    Разрешение MAC-адресов  Не видно (кэш ARP уже заполнен, пакеты не генерировались)
+    Структура заголовка     Переменная длина. В выводе присутствуют options [nop,nop,TS val ...], что расширяет заголовок сверх базовых 20 байт
+    Контрольная сумма       Присутствует в IP-заголовке (проверяется на каждом маршрутизаторе)
+
+для ipv6:
+    Формат адресации        2a12:5940:1ce2::2, fe80::... (128 бит, шестнадцатеричный)
+    Разрешение MAC-адресов  Видны явно: ICMP6, neighbor solicitation и neighbor advertisement (протокол NDP)
+    Структура заголовка     Фиксированный базовый заголовок 40 байт. Дополнительные параметры выносятся в Extension Headers, в базовом дампе не отображаются как опции
+    Контрольная сумма       Отсутствует в IP-заголовке. Проверка целостности перенесена на уровень L4 (TCP/UDP/ICMPv6)

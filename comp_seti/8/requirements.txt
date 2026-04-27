@@ -1,0 +1,6 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+psycopg2-binary==2.9.9
+selenium==4.17.2
+undetected-chromedriver==3.5.4
+selenium-stealth==1.0.6
