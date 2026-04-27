@@ -14,35 +14,40 @@ using namespace chrono;
 
 double sequential_init_and_mult(size_t n, double start_val)
 {
-    vector<double> matrix(n * n);
-    vector<double> vec(n);
-    vector<double> result(n, 0.0);
+    double *matrix = new double[n * n];
+    double *vec = new double[n];
+    double *result = new double[n]();
 
-    // Инициализация
     for (size_t i = 0; i < n; ++i)
     {
         vec[i] = start_val + static_cast<double>(i);
     }
-    for (size_t i = 0; i < n; ++i)
+
+    for (size_t i = 0; i < n * n; ++i)
     {
-        for (size_t j = 0; j < n; ++j)
-        {
-            matrix[i * n + j] = start_val + static_cast<double>(i * n + j);
-        }
+        matrix[i] = start_val + static_cast<double>(i);
     }
 
-    // Вычисления
+    // Вычисления + замер
     auto t1 = high_resolution_clock::now();
+
     for (size_t i = 0; i < n; ++i)
     {
         double sum = 0.0;
+        size_t row_start = i * n;
         for (size_t j = 0; j < n; ++j)
         {
-            sum += matrix[i * n + j] * vec[j];
+            sum += matrix[row_start + j] * vec[j];
         }
         result[i] = sum;
     }
+
     auto t2 = high_resolution_clock::now();
+
+    delete[] matrix;
+    delete[] vec;
+    delete[] result;
+
     return duration<double>(t2 - t1).count();
 }
 
