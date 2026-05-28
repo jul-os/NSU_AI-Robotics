@@ -90,7 +90,7 @@ class WindowImage:
 def get_latest_from_queue(q: queue.Queue, last_value: Any) -> Any:
     try:
         while True:
-            last_value = q.get_nowait()
+            last_value = q.get_nowait()  # Опустошить очередь, оставить только последнее
     except queue.Empty:
         pass
     return last_value
@@ -117,9 +117,6 @@ def main():
     )
     parser.add_argument(
         "--fps", type=float, default=30.0, help="Display frequency in Hz"
-    )
-    parser.add_argument(
-        "--test", action="store_true", help="Run without camera for sensor testing"
     )
     args = parser.parse_args()
 
@@ -205,12 +202,12 @@ def main():
                 stop_event.set()
 
     except KeyboardInterrupt:
-        stop_event.set()
+        stop_event.set()  # устанавливает флаг stop_event, будит другие потоки
 
     finally:
         stop_event.set()
         for t in threads:
-            t.join(timeout=1.0)
+            t.join(timeout=1.0)  # Ждём завершения с таймаутом
         if sensor_cam and hasattr(sensor_cam, "cap"):
             sensor_cam.cap.release()
         cv2.destroyAllWindows()

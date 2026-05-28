@@ -49,7 +49,6 @@ class Worker(threading.Thread):
                 idx, frame = item
                 result = self.processor.process(frame)
                 self.out_q.put((idx, result))
-                self.in_q.task_done()
             except queue.Empty:
                 continue
 
