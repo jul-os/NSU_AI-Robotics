@@ -118,6 +118,9 @@ def main():
     parser.add_argument(
         "--fps", type=float, default=30.0, help="Display frequency in Hz"
     )
+    parser.add_argument(
+        "--test", action="store_true", help="Run without camera for sensor testing"
+    )
     args = parser.parse_args()
 
     try:
