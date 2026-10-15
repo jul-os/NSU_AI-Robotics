@@ -18,3 +18,5 @@ dist/
 # Temporary files
 *.tmp
 *.bak
+
+__pycache__
