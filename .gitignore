@@ -18,7 +18,8 @@ dist/
 # Temporary files
 *.tmp
 *.bak
-
+__pycache__/
+*.pyc
 __pycache__
 # Byte-compiled / optimized / DLL files
 __pycache__/
