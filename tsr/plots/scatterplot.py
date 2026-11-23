@@ -2529,6 +2529,7 @@ def scatter2d(
     class_regression: bool | None = None,
     confidence: bool | None = None,
     return_fig: bool = True,
+    ax: plt.Axes | None = None,
 ) -> ScatterResult | None:
     """Draw a full 2-D scatter plot from primitive matplotlib objects.
 
@@ -2637,27 +2638,30 @@ def scatter2d(
     fcfg = cfg.get("figure", {})
     side = float(fcfg.get("size", 8.0))
     frac = float(np.clip(fcfg.get("plot_fraction", 0.80), 0.2, 1.0))
-    with plt.rc_context(HELVETICA_RC):
-        fig = plt.figure(figsize=(side, side), dpi=int(fcfg.get("dpi", 120)),
-                         facecolor=fcfg.get("facecolor", "white"))
-        left = 0.5 - frac / 2.0
-        bottom = 0.5 - frac / 2.0
-        anchor = str(fcfg.get("anchor", "center"))
-        # horizontal room for the y tick labels + the ylabel, vertical room for the
-        # x tick labels + the xlabel
-        left_pad, bottom_pad = 0.10, 0.11
-        if anchor == "left":
-            left, bottom = left_pad, bottom_pad + (0.5 - frac / 2.0)
-        elif anchor == "right":
-            left, bottom = 1.0 - frac - 0.16, bottom_pad + (0.5 - frac / 2.0)
-        elif anchor == "top":
-            left, bottom = 0.5 - frac / 2.0, 1.0 - frac - 0.12
-        elif anchor == "bottom":
-            left, bottom = 0.5 - frac / 2.0, bottom_pad
-        ax = fig.add_axes([left, bottom, frac, frac])   # a square axes on a square figure
-        ax.set_facecolor(fcfg.get("axes_facecolor", fcfg.get("facecolor", "white")))
-        for side_name in ax.spines:
-            ax.spines[side_name].set_visible(False)
+    if ax is None:
+        with plt.rc_context(HELVETICA_RC):
+            fig = plt.figure(figsize=(side, side), dpi=int(fcfg.get("dpi", 120)),
+                             facecolor=fcfg.get("facecolor", "white"))
+            left = 0.5 - frac / 2.0
+            bottom = 0.5 - frac / 2.0
+            anchor = str(fcfg.get("anchor", "center"))
+            # horizontal room for the y tick labels + the ylabel, vertical room for the
+            # x tick labels + the xlabel
+            left_pad, bottom_pad = 0.10, 0.11
+            if anchor == "left":
+                left, bottom = left_pad, bottom_pad + (0.5 - frac / 2.0)
+            elif anchor == "right":
+                left, bottom = 1.0 - frac - 0.16, bottom_pad + (0.5 - frac / 2.0)
+            elif anchor == "top":
+                left, bottom = 0.5 - frac / 2.0, 1.0 - frac - 0.12
+            elif anchor == "bottom":
+                left, bottom = 0.5 - frac / 2.0, bottom_pad
+            ax = fig.add_axes([left, bottom, frac, frac])
+            ax.set_facecolor(fcfg.get("axes_facecolor", fcfg.get("facecolor", "white")))
+            for side_name in ax.spines:
+                ax.spines[side_name].set_visible(False)
+    else:
+        fig = ax.figure
 
     # --------------------------------------------------- per-class style lookup --
     class_styles: dict[Any, dict[str, Any]] = {}
@@ -2715,4 +2719,3 @@ def scatter2d(
         hidden_tick_labels=scaffold.hidden_labels,
     )
     return result if return_fig else None
-

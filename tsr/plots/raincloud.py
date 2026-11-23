@@ -92,6 +92,7 @@ def raincloud_horizontal(
     
     x_label: str | None = None,
     random_state: int = 123,
+    point_alpha: float | None = None,
     show_legend: bool = True
 ):
     """
@@ -285,7 +286,7 @@ def raincloud_horizontal(
             np.full(len(values), points_y[class_index])
             + y_jitter,
             s=style["size"],
-            alpha=style["alpha"],
+            alpha=style["alpha"] if point_alpha is None else point_alpha,
             color=color,
             edgecolors="#1F1F1F",
             linewidths=style["outline_width"],
